@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CleanTxa</string>
+    <string name="splash_tagline">Dọn dẹp Android TV của bạn</string>
+
+    <string name="home_subtitle">Chọn cách bắt đầu</string>
+    <string name="card_connect_title">Kết nối TV</string>
+    <string name="card_connect_desc">Liên kết điện thoại với TV qua Wi-Fi, rồi sao lưu và tự chọn app rác cần dọn.</string>
+    <string name="card_guide_title">Hướng dẫn kết nối</string>
+    <string name="card_guide_desc">Lần đầu dùng? Làm theo các bước để bật chế độ gỡ lỗi trên TV để app kết nối được.</string>
+
+    <string name="back">Quay lại</string>
+
+    <string name="guide_title">Hướng dẫn kết nối</string>
+    <string name="guide_intro">Làm các bước này một lần trên TV. Bạn cần điều khiển TV và điện thoại cùng mạng Wi-Fi.</string>
+    <string name="guide_s1_title">Cùng mạng Wi-Fi</string>
+    <string name="guide_s1_body">Nối điện thoại và TV vào cùng một mạng Wi-Fi. Mạng khách hoặc VPN trên điện thoại có thể chặn kết nối.</string>
+    <string name="guide_s2_title">Mở phần Giới thiệu</string>
+    <string name="guide_s2_body">Trên TV vào Cài đặt, rồi Tùy chọn thiết bị, rồi Giới thiệu (About).</string>
+    <string name="guide_s3_title">Mở khóa tùy chọn nhà phát triển</string>
+    <string name="guide_s3_body">Chọn dòng \"Bản dựng\" (Build) và bấm OK trên điều khiển 7 lần. TV sẽ báo bạn đã trở thành nhà phát triển.</string>
+    <string name="guide_s4_title">Bật gỡ lỗi</string>
+    <string name="guide_s4_body">Quay lại, vào Tùy chọn nhà phát triển và bật Gỡ lỗi USB. Nếu thấy thêm Gỡ lỗi mạng hoặc Gỡ lỗi không dây thì bật luôn.</string>
+    <string name="guide_s5_title">Tìm địa chỉ của TV</string>
+    <string name="guide_s5_body">Vào Cài đặt, rồi Mạng, chọn Wi-Fi đang dùng. Ghi lại địa chỉ IP, ví dụ 192.168.1.25.</string>
+    <string name="guide_s6_title">Kết nối và cho phép</string>
+    <string name="guide_s6_body">Trong CleanTxa chọn Kết nối TV và nhập địa chỉ IP. TV sẽ hiện hộp \"Cho phép gỡ lỗi USB?\": tick \"Luôn cho phép\" rồi chọn Cho phép.</string>
+    <string name="guide_s7_title">Cần biết</string>
+    <string name="guide_s7_body">Giữ TV bật trong suốt phiên làm việc. Một số đầu TV cắt điện cổng USB khi bật gỡ lỗi. Samsung (Tizen), LG (webOS), Roku và Fire TV không được hỗ trợ; với các máy này xem cleanyour.tv/not-android.</string>
+    <string name="guide_go_connect">Đi tới Kết nối</string>
+
+    <string name="connect_title">Kết nối TV</string>
+    <string name="connect_intro">Nhập địa chỉ TV lấy từ phần hướng dẫn. Chưa cài đặt xong? Mở hướng dẫn kết nối trước.</string>
+    <string name="connect_ip_label">Địa chỉ IP của TV</string>
+    <string name="connect_ip_hint">ví dụ 192.168.1.25</string>
+    <string name="connect_port_label">Cổng</string>
+    <string name="connect_button">Kết nối</string>
+    <string name="connect_disconnect">Ngắt kết nối</string>
+    <string name="connect_open_guide">Mở hướng dẫn kết nối</string>
+    <string name="connect_connecting">Đang kết nối… hãy nhìn màn hình TV và chọn Cho phép nếu được hỏi.</string>
+    <string name="connect_ok_title">Đã kết nối</string>
+    <string name="connect_ok_device">Thiết bị: %1$s</string>
+    <string name="connect_ok_android">Android %1$s</string>
+    <string name="connect_err_ip">Hãy nhập địa chỉ IP hợp lệ, như 192.168.1.25.</string>
+    <string name="connect_err_failed">Không kết nối được. Kiểm tra đã bật gỡ lỗi, TV đang bật và cùng Wi-Fi rồi thử lại.</string>
+    <string name="connect_err_detail">Chi tiết: %1$s</string>
+</resources>

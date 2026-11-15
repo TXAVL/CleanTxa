@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">CleanTxa Home</string>
+    <string name="home_key_service">CleanTxa Home Key Service</string>
+    <string name="input_key_service">CleanTxa Input Key Service</string>
+    <string name="now_playing_service">CleanTxa Now Playing</string>
+    <string name="screensaver_label">CleanTxa Clock</string>
+</resources>
+

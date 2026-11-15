@@ -1,0 +1,11 @@
+.gradle/
+**/build/
+local.properties
+*.iml
+.idea/
+captures/
+.impeccable/live/
+*.apk
+!app/src/main/assets/*.apk
+*.aab
+backups/

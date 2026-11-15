@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer TV frame (fits safely inside 66dp adaptive icon safe zone: 21..87) -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M31,35 L77,35 A5,5 0 0,1 82,40 L82,66 A5,5 0 0,1 77,71 L31,71 A5,5 0 0,1 26,66 L26,40 A5,5 0 0,1 31,35 Z"
+        android:strokeColor="#2EC4B6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="4.5" />
+    <!-- TV stand -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M43,78 L65,78"
+        android:strokeColor="#2EC4B6"
+        android:strokeLineCap="round"
+        android:strokeWidth="4.2" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,71 L54,78"
+        android:strokeColor="#2EC4B6"
+        android:strokeLineCap="round"
+        android:strokeWidth="4.2" />
+    <!-- Clean checkmark inside screen -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M41,53 L50,62 L68,44"
+        android:strokeColor="#B6F2EA"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="5.2" />
+    <!-- Sparkle accent -->
+    <path
+        android:fillColor="#2EC4B6"
+        android:pathData="M73,27 L74.6,31.4 L79,33 L74.6,34.6 L73,39 L71.4,34.6 L67,33 L71.4,31.4 Z" />
+</vector>

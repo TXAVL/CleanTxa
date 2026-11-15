@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CleanTxa</string>
+    <string name="splash_tagline">Clean up your Android TV</string>
+
+    <string name="home_subtitle">Choose how to start</string>
+    <string name="card_connect_title">Connect to TV</string>
+    <string name="card_connect_desc">Link your phone to the TV over Wi-Fi, then back it up and clean out the junk apps yourself.</string>
+    <string name="card_guide_title">Connection guide</string>
+    <string name="card_guide_desc">First time? Follow the steps to turn on debugging on your TV so the app can connect.</string>
+
+    <string name="back">Back</string>
+
+    <string name="guide_title">Connection guide</string>
+    <string name="guide_intro">Do these steps once on your TV. You will need the TV remote and your phone on the same Wi-Fi.</string>
+    <string name="guide_s1_title">Same Wi-Fi</string>
+    <string name="guide_s1_body">Connect the phone and the TV to the same Wi-Fi network. A guest network or a VPN on the phone can block the connection.</string>
+    <string name="guide_s2_title">Open About</string>
+    <string name="guide_s2_body">On the TV open Settings, then Device Preferences, then About.</string>
+    <string name="guide_s3_title">Unlock developer options</string>
+    <string name="guide_s3_body">Highlight \"Build\" and press OK on the remote 7 times. The TV says you are now a developer.</string>
+    <string name="guide_s4_title">Turn on debugging</string>
+    <string name="guide_s4_body">Go back, open Developer options, and turn on USB debugging. If you also see Network debugging or Wireless debugging, turn it on too.</string>
+    <string name="guide_s5_title">Find the TV address</string>
+    <string name="guide_s5_body">Open Settings, then Network, and select your Wi-Fi. Write down the IP address, for example 192.168.1.25.</string>
+    <string name="guide_s6_title">Connect and allow</string>
+    <string name="guide_s6_body">In CleanTxa choose Connect to TV and enter the IP address. A box \"Allow USB debugging?\" appears on the TV: tick \"Always allow\" and choose Allow.</string>
+    <string name="guide_s7_title">Good to know</string>
+    <string name="guide_s7_body">Keep the TV on during the whole session. Some boxes cut power to their USB port while debugging is on. Samsung (Tizen), LG (webOS), Roku and Fire TV are not supported; for those see cleanyour.tv/not-android.</string>
+    <string name="guide_go_connect">Go to Connect</string>
+
+    <string name="connect_title">Connect to TV</string>
+    <string name="connect_intro">Enter the TV address from the guide. Not set up yet? Open the connection guide first.</string>
+    <string name="connect_ip_label">TV IP address</string>
+    <string name="connect_ip_hint">for example 192.168.1.25</string>
+    <string name="connect_port_label">Port</string>
+    <string name="connect_button">Connect</string>
+    <string name="connect_disconnect">Disconnect</string>
+    <string name="connect_open_guide">Open connection guide</string>
+    <string name="connect_connecting">Connecting… look at the TV and choose Allow if asked.</string>
+    <string name="connect_ok_title">Connected</string>
+    <string name="connect_ok_device">Device: %1$s</string>
+    <string name="connect_ok_android">Android %1$s</string>
+    <string name="connect_err_ip">Enter a valid IP address, like 192.168.1.25.</string>
+    <string name="connect_err_failed">Could not connect. Check that debugging is on, the TV is awake and on the same Wi-Fi, then try again.</string>
+    <string name="connect_err_detail">Detail: %1$s</string>
+</resources>
