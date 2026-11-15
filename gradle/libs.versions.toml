@@ -11,6 +11,7 @@ bcpkix = "1.81"
 junit = "4.13.2"
 json = "20240303"
 workRuntimeKtx = "2.10.0"
+zxingCore = "3.5.3"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
@@ -28,6 +29,7 @@ bcpkix-jdk15to18 = { module = "org.bouncycastle:bcpkix-jdk15to18", version.ref =
 junit = { module = "junit:junit", version.ref = "junit" }
 org-json = { module = "org.json:json", version.ref = "json" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxingCore" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

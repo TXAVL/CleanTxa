@@ -39,7 +39,7 @@ import java.net.Inet4Address
 import java.net.InetSocketAddress
 import java.net.Socket
 
-enum class Man { CHINH, KET_NOI, THONG_TIN, CHON_GOI, DANG_TAT, HOME_SACH, XONG, KHOI_PHUC, HUONG_DAN, GIAY_PHEP, KHOA_TRE, REMOTE }
+enum class Man { CHINH, KET_NOI, THONG_TIN, CHON_GOI, DANG_TAT, HOME_SACH, XONG, KHOI_PHUC, HUONG_DAN, GIAY_PHEP, KHOA_TRE, REMOTE, LOGS, TV_LOI_QR }
 
 /** Số app tối đa trong dock: bằng số cột lớn nhất của Home sạch (columns 1–8); dock dài hơn số cột thì tràn xuống hàng sau (22/10/2026, góp ý muốn hàng đầu nhiều app hơn). */
 const val DOCK_TOI_DA = 8
@@ -96,6 +96,17 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
 
     fun moHuongDan() { if (man != Man.HUONG_DAN) manTruoc = man; man = Man.HUONG_DAN }
     fun moGiayPhep() { if (man != Man.GIAY_PHEP) manTruoc = man; man = Man.GIAY_PHEP }
+    fun moLogs() { if (man != Man.LOGS && man != Man.TV_LOI_QR) manTruoc = man; man = Man.LOGS }
+    fun moManLoiQr() { if (man != Man.TV_LOI_QR) manTruoc = man; man = Man.TV_LOI_QR }
+
+    fun tvSummaryForLogs(): String? = thongTin?.let { tt ->
+        buildString {
+            appendLine("TV Model : ${tt.brand} ${tt.model} (${tt.tenHienThi})")
+            appendLine("TV IP    : ${ip.ifBlank { "localhost" }}:$cong")
+            appendLine("Android  : ${tt.android} (SDK ${tt.sdk})")
+            appendLine("Home     : ${trangThai?.homeHienTai ?: "?"}")
+        }.trim()
+    }
     var dangBan by mutableStateOf(false)
     var thongBao by mutableStateOf("")
     var loi by mutableStateOf("")
@@ -499,9 +510,13 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     var loiCapNhat by mutableStateOf("")
 
     init {
+        com.txa.cleantxa.TxaLogger.init(ctx)
         ip = prefs.getString("ip", "") ?: ""
         cong = prefs.getString("cong", "5555") ?: "5555"
         taiLaiSaoLuu()
+        if (com.txa.cleantxa.ManHinh.laTv && com.txa.cleantxa.TxaLogger.hasPendingTvError(ctx)) {
+            man = Man.TV_LOI_QR
+        }
         viewModelScope.launch {
             val b = runCatching { io { com.txa.cleantxa.CapNhat.kiemTra(ctx) } }.getOrNull()
             banMoi = b
@@ -586,9 +601,17 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         if (dangBan) return
         dangBan = true; loi = ""; canDonBoNho = false; thongBao = viec
         viewModelScope.launch {
+            com.txa.cleantxa.TxaLogger.i("Action", viec)
             try { khoi() } catch (e: Throwable) {
-                android.util.Log.w("CleanTxa", viec, e)
-                loi = moTaLoi(e)
+                com.txa.cleantxa.TxaLogger.e("Action", viec, e)
+                val msg = moTaLoi(e)
+                if (com.txa.cleantxa.ManHinh.laTv) {
+                    com.txa.cleantxa.TxaLogger.markPendingTvError(ctx, "$viec: $msg")
+                    loi = ""
+                    man = Man.TV_LOI_QR
+                } else {
+                    loi = msg
+                }
             } finally { dangBan = false; thongBao = "" }
         }
     }

@@ -36,6 +36,7 @@ class MainActivity : ComponentActivity() {
         runCatching { java.security.Security.insertProviderAt(org.conscrypt.Conscrypt.newProvider(), 1) }
         NgonNgu.nap(this)
         ManHinh.doc(this)
+        TxaLogger.init(this)
         CapNhat.donOtaCuNeuDoiBan(this)
         ThongBaoCapNhat.hen(this)
         docYDinh(intent)

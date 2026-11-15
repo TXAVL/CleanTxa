@@ -133,6 +133,8 @@ fun CleanTxaApp(vm: PhienLamViec) {
                     Man.GIAY_PHEP -> LicensesScreen()
                     Man.KHOA_TRE -> KidsLockScreen(vm)
                     Man.REMOTE -> RemoteScreen(vm)
+                    Man.LOGS -> LogsScreen(vm)
+                    Man.TV_LOI_QR -> TvErrorQrScreen(vm)
                 }
             }
         }
@@ -253,7 +255,8 @@ fun CleanTxaApp(vm: PhienLamViec) {
 fun navigateBack(vm: PhienLamViec) {
     when (vm.man) {
         Man.CHINH -> Unit
-        Man.HUONG_DAN, Man.GIAY_PHEP -> vm.man = vm.manTruoc
+        Man.HUONG_DAN, Man.GIAY_PHEP, Man.LOGS -> vm.man = vm.manTruoc
+        Man.TV_LOI_QR -> vm.man = Man.CHINH
         Man.KET_NOI -> vm.veManChinh()
         Man.THONG_TIN -> vm.veManChinh()
         Man.CHON_GOI, Man.KHOI_PHUC, Man.KHOA_TRE, Man.REMOTE -> vm.man = Man.THONG_TIN
@@ -289,6 +292,8 @@ private fun CleanTxaTopBar(vm: PhienLamViec) {
         Man.GIAY_PHEP -> t("Giấy phép nguồn mở", "Open-source licenses")
         Man.KHOA_TRE -> t("Khoá trẻ em", "Kids lock")
         Man.REMOTE -> t("Remote tivi", "TV Remote")
+        Man.LOGS -> t("Nhật ký (Logs)", "Logs")
+        Man.TV_LOI_QR -> t("Xem logs qua Web (2311)", "Web Logs (2311)")
     }
 
     CenterAlignedTopAppBar(
@@ -311,6 +316,11 @@ private fun CleanTxaTopBar(vm: PhienLamViec) {
             Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         },
         actions = {
+            if (vm.man != Man.LOGS) {
+                IconButton(onClick = { vm.moLogs() }) {
+                    Icon(Icons.Default.Terminal, contentDescription = t("Nhật ký", "Logs"))
+                }
+            }
             if (vm.man != Man.HUONG_DAN) {
                 IconButton(onClick = { vm.moHuongDan() }) {
                     Icon(Icons.AutoMirrored.Filled.HelpOutline, contentDescription = t("Hướng dẫn", "Guide"))

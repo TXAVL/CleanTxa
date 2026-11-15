@@ -15,8 +15,8 @@ android {
         applicationId = "com.txa.cleantxa"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
     }
 
     buildTypes {
@@ -56,6 +56,7 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.zxing.core)
     implementation(libs.libadb.android)
     implementation(libs.conscrypt.android)
     implementation(libs.bcpkix.jdk15to18)
