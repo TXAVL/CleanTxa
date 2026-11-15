@@ -224,6 +224,21 @@ fun CleanTxaApp(vm: PhienLamViec) {
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,
                                 )
+                                val stepProgress = when (step) {
+                                    BuocCaiDat.CHUA_BAT_DAU -> 0f
+                                    BuocCaiDat.DANG_TAI -> {
+                                        val daTai = progress?.daTai ?: 0L
+                                        val tong = progress?.tong ?: b.apkSizeBytes
+                                        if (tong > 0L) (daTai.toFloat() / tong.toFloat()).coerceIn(0.05f, 0.45f) else 0.25f
+                                    }
+                                    BuocCaiDat.SAN_SANG_CAI -> 0.55f
+                                    BuocCaiDat.CHO_PLAY_PROTECT -> 0.80f
+                                    BuocCaiDat.HOAN_TAT -> 1f
+                                }
+                                LinearProgressIndicator(
+                                    progress = { stepProgress },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
                                 UpdateStepRow(
                                     idx = 1,
                                     label = t("Tải tệp APK", "Download APK"),
@@ -321,7 +336,11 @@ fun CleanTxaApp(vm: PhienLamViec) {
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
                                         Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            LinearProgressIndicator(
+                                                progress = { 1f },
+                                                modifier = Modifier.fillMaxWidth(),
+                                            )
                                             Text(
                                                 t(
                                                     "Đã tải xong ${downloadedFile.name} (${com.txa.cleantxa.TxaFormat.bytes(downloadedFile.length())})",
@@ -551,9 +570,9 @@ private fun StepProgressBar(currentStep: Int) {
 @Composable
 fun StatusBanner(vm: PhienLamViec) {
     Column(Modifier.fillMaxWidth()) {
-        if (vm.dangBan) {
+        if (vm.dangBan || vm.dangQuet || vm.dangTimGhep || vm.dangKiemTraCapNhat) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
-            if (vm.thongBao.isNotBlank()) {
+            if (vm.dangBan && vm.thongBao.isNotBlank()) {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier.fillMaxWidth()
