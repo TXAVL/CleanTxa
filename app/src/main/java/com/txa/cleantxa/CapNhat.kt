@@ -153,10 +153,41 @@ object CapNhat {
     @Volatile
     var moTuThongBao = false
 
-    /** Tải APK bản mới vào cache rồi mở hộp cài của Android. */
-    fun taiVaCai(ctx: Context, ban: BanMoi) {
+    /** Tải APK bản mới vào cache với callback tiến trình (bytes đã tải, tổng bytes). */
+    fun taiApk(ctx: Context, ban: BanMoi, onProgress: (Long, Long) -> Unit = { _, _ -> }): File {
         val f = File(ctx.cacheDir, "cap-nhat/CleanTxa-${ban.versionName}.apk").apply { parentFile?.mkdirs() }
-        f.writeBytes(tai(ban.apk, 120))
+        val tam = File(f.path + ".tam")
+        val c = URL(ban.apk).openConnection() as HttpURLConnection
+        c.connectTimeout = 20_000
+        c.readTimeout = 120_000
+        c.setRequestProperty("Cache-Control", "no-cache")
+        c.setRequestProperty("User-Agent", "CleanTxa/${BuildConfig.VERSION_NAME}")
+        try {
+            if (c.responseCode != 200) error("HTTP ${c.responseCode} ${ban.apk}")
+            val tong = c.contentLengthLong
+            var daTai = 0L
+            c.inputStream.use { inp ->
+                tam.outputStream().use { out ->
+                    val buf = ByteArray(16 * 1024)
+                    while (true) {
+                        val n = inp.read(buf)
+                        if (n <= 0) break
+                        out.write(buf, 0, n)
+                        daTai += n
+                        onProgress(daTai, tong)
+                    }
+                }
+            }
+            if (f.exists()) f.delete()
+            if (!tam.renameTo(f)) error("Không lưu được file APK")
+            return f
+        } finally {
+            c.disconnect()
+        }
+    }
+
+    /** Mở hộp cài đặt APK của Android từ file đã tải. */
+    fun moCaiApk(ctx: Context, f: File) {
         val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", f)
         ctx.startActivity(
             Intent(Intent.ACTION_VIEW).apply {
@@ -164,5 +195,10 @@ object CapNhat {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
         )
+    }
+
+    /** Tải APK bản mới vào cache rồi mở hộp cài của Android. */
+    fun taiVaCai(ctx: Context, ban: BanMoi) {
+        moCaiApk(ctx, taiApk(ctx, ban))
     }
 }

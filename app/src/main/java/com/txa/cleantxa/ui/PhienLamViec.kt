@@ -494,6 +494,9 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     var banMoi by mutableStateOf<com.txa.cleantxa.CapNhat.BanMoi?>(null)
     var dangCapNhat by mutableStateOf(false)
     var hoiCapNhat by mutableStateOf(false)
+    var tienTrinhCapNhat by mutableStateOf<Pair<Long, Long>?>(null)
+    var apkDaTai by mutableStateOf<java.io.File?>(null)
+    var loiCapNhat by mutableStateOf("")
 
     init {
         ip = prefs.getString("ip", "") ?: ""
@@ -515,11 +518,13 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     }
 
     private fun xuLyBanMoi(b: com.txa.cleantxa.CapNhat.BanMoi) {
+        val p = ctx.getSharedPreferences("ota", Context.MODE_PRIVATE)
         if (com.txa.cleantxa.CapNhat.moTuThongBao) {
             com.txa.cleantxa.CapNhat.moTuThongBao = false
-            hoiCapNhat = false
+            hoiCapNhat = true
             capNhatApp()
-        } else {
+        } else if (p.getInt("da_hoi", 0) < b.versionCode) {
+            p.edit().putInt("da_hoi", b.versionCode).putInt("da_bao", maxOf(p.getInt("da_bao", 0), b.versionCode)).apply()
             hoiCapNhat = true
         }
     }
@@ -527,16 +532,52 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     fun capNhatApp() {
         val b = banMoi ?: return
         if (dangCapNhat) return
+        hoiCapNhat = true
         dangCapNhat = true
+        loiCapNhat = ""
+        tienTrinhCapNhat = 0L to -1L
         viewModelScope.launch {
             try {
-                io { com.txa.cleantxa.CapNhat.taiVaCai(ctx, b) }
+                if (android.os.Build.VERSION.SDK_INT >= 26 && !ctx.packageManager.canRequestPackageInstalls()) {
+                    if (com.txa.cleantxa.ManHinh.laTv && thongTin != null) {
+                        runCatching { io { tv.choPhepCaiApp(ctx.packageName) } }
+                    }
+                    if (!ctx.packageManager.canRequestPackageInstalls()) {
+                        val moDuoc = runCatching {
+                            ctx.startActivity(
+                                android.content.Intent(
+                                    android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                    android.net.Uri.parse("package:" + ctx.packageName),
+                                ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        }.isSuccess
+                        loiCapNhat = if (moDuoc) {
+                            t("Cho phép CleanTxa cài ứng dụng, rồi quay lại bấm Thử lại / Cập nhật.", "Allow CleanTxa to install apps, then come back and press Update.")
+                        } else {
+                            t("Tivi chưa cho CleanTxa cài bản mới. Vào Cài đặt → Ứng dụng → CleanTxa (hoặc Bảo mật → Nguồn không xác định), bật cho phép cài rồi thử lại.", "This device hasn't allowed CleanTxa to install updates yet. Enable Unknown sources for CleanTxa in Settings and retry.")
+                        }
+                        return@launch
+                    }
+                }
+                val file = io {
+                    com.txa.cleantxa.CapNhat.taiApk(ctx, b) { daTai, tong ->
+                        tienTrinhCapNhat = daTai to tong
+                    }
+                }
+                apkDaTai = file
+                com.txa.cleantxa.CapNhat.moCaiApk(ctx, file)
             } catch (e: Throwable) {
-                loi = t("Không tải được bản cập nhật: ${e.message}", "Update download failed: ${e.message}")
+                loiCapNhat = t("Không tải được bản cập nhật: ${e.message}", "Update download failed: ${e.message}")
             } finally {
                 dangCapNhat = false
             }
         }
+    }
+
+    fun caiApkDaTai() {
+        val f = apkDaTai ?: return
+        runCatching { com.txa.cleantxa.CapNhat.moCaiApk(ctx, f) }
+            .onFailure { loiCapNhat = t("Không mở được trình cài đặt: ${it.message}", "Could not open installer: ${it.message}") }
     }
 
     fun taiLaiSaoLuu() { dsSaoLuu = kho.tatCa() }

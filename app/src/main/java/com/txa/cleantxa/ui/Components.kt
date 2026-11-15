@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
@@ -141,32 +142,107 @@ fun CleanTxaApp(vm: PhienLamViec) {
 
     if (vm.hoiCapNhat) {
         vm.banMoi?.let { b ->
+            val downloadedFile = vm.apkDaTai
+            val progress = vm.tienTrinhCapNhat
             AlertDialog(
-                onDismissRequest = { vm.hoiCapNhat = false },
+                onDismissRequest = { if (!vm.dangCapNhat) vm.hoiCapNhat = false },
                 title = {
                     Text(t("Đã có CleanTxa ${b.versionName}", "CleanTxa ${b.versionName} is out"))
                 },
                 text = {
-                    Text(
-                        b.ghiChu.ifBlank {
-                            t("Bạn có muốn tải và cài đặt bản cập nhật mới ngay không?", "Download and install the new update now?")
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            b.ghiChu.ifBlank {
+                                t("Bạn có muốn tải và cài đặt bản cập nhật mới ngay không?", "Download and install the new update now?")
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        when {
+                            vm.dangCapNhat -> {
+                                val daTai = progress?.first ?: 0L
+                                val tong = progress?.second ?: -1L
+                                if (tong > 0L) {
+                                    LinearProgressIndicator(
+                                        progress = { (daTai.toFloat() / tong.toFloat()).coerceIn(0f, 1f) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                    Text(
+                                        t(
+                                            "Đang tải: ${"%.1f".format(daTai / 1048576.0)} / ${"%.1f".format(tong / 1048576.0)} MB",
+                                            "Downloading: ${"%.1f".format(daTai / 1048576.0)} / ${"%.1f".format(tong / 1048576.0)} MB"
+                                        ),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                } else {
+                                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                    Text(
+                                        t(
+                                            "Đang tải: ${"%.1f".format(daTai / 1048576.0)} MB…",
+                                            "Downloading: ${"%.1f".format(daTai / 1048576.0)} MB…"
+                                        ),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                            downloadedFile != null -> {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Row(
+                                        Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                        Text(
+                                            t(
+                                                "Đã tải xong ${downloadedFile.name} (${"%.1f".format(downloadedFile.length() / 1048576.0)} MB) — sẵn sàng cài đặt.",
+                                                "Downloaded ${downloadedFile.name} (${"%.1f".format(downloadedFile.length() / 1048576.0)} MB) — ready to install."
+                                            ),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                    }
+                                }
+                            }
+                            vm.loiCapNhat.isNotBlank() -> {
+                                Text(
+                                    vm.loiCapNhat,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
                         }
-                    )
+                    }
                 },
                 confirmButton = {
-                    Button(
-                        onClick = {
-                            vm.hoiCapNhat = false
-                            vm.capNhatApp()
-                        },
-                        enabled = !vm.dangCapNhat,
-                    ) {
-                        Text(if (vm.dangCapNhat) t("Đang tải…", "Downloading…") else t("Cập nhật", "Update"))
+                    when {
+                        vm.dangCapNhat -> {
+                            Button(onClick = {}, enabled = false) {
+                                Text(t("Đang tải…", "Downloading…"))
+                            }
+                        }
+                        downloadedFile != null -> {
+                            Button(onClick = { vm.caiApkDaTai() }) {
+                                Text(t("Cài đặt ngay", "Install now"))
+                            }
+                        }
+                        else -> {
+                            Button(onClick = { vm.capNhatApp() }) {
+                                Text(if (vm.loiCapNhat.isNotBlank()) t("Thử lại", "Retry") else t("Tải & cài đặt", "Download & install"))
+                            }
+                        }
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { vm.hoiCapNhat = false }) {
-                        Text(t("Để sau", "Later"))
+                    if (!vm.dangCapNhat) {
+                        TextButton(onClick = { vm.hoiCapNhat = false }) {
+                            Text(t("Để sau", "Later"))
+                        }
                     }
                 },
             )
