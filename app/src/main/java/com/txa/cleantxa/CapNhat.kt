@@ -18,7 +18,15 @@ object CapNhat {
     const val REPO = "TXAVL/CleanTxa"
     const val RELEASE_API = "https://api.github.com/repos/$REPO/releases/latest"
 
-    data class BanMoi(val versionCode: Int, val versionName: String, val apk: String, val ghiChu: String)
+    data class BanMoi(
+        val versionCode: Int,
+        val versionName: String,
+        val apk: String,
+        val ghiChuVi: String,
+        val ghiChuEn: String = ghiChuVi,
+    ) {
+        val ghiChu: String get() = t(ghiChuVi, ghiChuEn)
+    }
 
     /** File dữ liệu đã tải về (nếu có) — DuLieu và launcher đọc file này trước assets. */
     fun fileDuLieu(ctx: Context, ten: String) = File(ctx.filesDir, "ota/$ten")
@@ -123,13 +131,27 @@ object CapNhat {
         }
         val url = apkUrl ?: return null
         val code = maPhienBan(ver).coerceAtLeast(BuildConfig.VERSION_CODE + 1)
-        val notes = rel.optString("body").trim()
+        val (vi, en) = tachGhiChuSongNgu(rel.optString("body"))
         return BanMoi(
             versionCode = code,
             versionName = ver,
             apk = url,
-            ghiChu = notes,
+            ghiChuVi = vi,
+            ghiChuEn = en,
         )
+    }
+
+    /**
+     * Tách changelog song ngữ từ GitHub Release body theo chuẩn `---`
+     * (trên là tiếng Việt, dưới `---` là tiếng Anh).
+     */
+    internal fun tachGhiChuSongNgu(body: String): Pair<String, String> {
+        val raw = body.replace("\r\n", "\n").trim()
+        if (raw.isEmpty()) return "" to ""
+        val parts = raw.split(Regex("(?m)^\\s*---\\s*$"), limit = 2)
+        val vi = parts[0].trim()
+        val en = parts.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() } ?: vi
+        return vi to en
     }
 
     internal fun soSanhPhienBan(a: String, b: String): Int {
