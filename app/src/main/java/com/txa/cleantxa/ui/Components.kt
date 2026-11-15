@@ -164,7 +164,12 @@ fun CleanTxaApp(vm: PhienLamViec) {
                     }
                 },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
                         Surface(
                             color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
                             shape = RoundedCornerShape(10.dp),
@@ -266,20 +271,6 @@ fun CleanTxaApp(vm: PhienLamViec) {
                             }
                         }
 
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 160.dp)
-                                .verticalScroll(rememberScrollState()),
-                        ) {
-                            Text(
-                                b.ghiChu.ifBlank {
-                                    t("Bạn có muốn tải và cài đặt bản cập nhật mới ngay không?", "Download and install the new update now?")
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-
                         when {
                             vm.dangCapNhat -> {
                                 val daTai = progress?.daTai ?: 0L
@@ -375,6 +366,20 @@ fun CleanTxaApp(vm: PhienLamViec) {
                                     color = MaterialTheme.colorScheme.error,
                                 )
                             }
+                        }
+
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 140.dp)
+                                .verticalScroll(rememberScrollState()),
+                        ) {
+                            Text(
+                                b.ghiChu.ifBlank {
+                                    t("Bạn có muốn tải và cài đặt bản cập nhật mới ngay không?", "Download and install the new update now?")
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
                         }
                     }
                 },
