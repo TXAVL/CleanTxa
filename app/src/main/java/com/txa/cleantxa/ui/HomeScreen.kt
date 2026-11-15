@@ -85,8 +85,15 @@ fun HomeScreen(vm: PhienLamViec) {
                             )
                         }
                     }
+                    val daTaiSan = vm.apkDaTai != null
                     TextButton(onClick = { vm.capNhatApp() }, enabled = !vm.dangCapNhat) {
-                        Text(if (vm.dangCapNhat) t("Đang tải…", "Downloading…") else t("Cập nhật", "Update"))
+                        Text(
+                            when {
+                                vm.dangCapNhat -> t("Đang tải…", "Downloading…")
+                                daTaiSan -> t("Cài đặt", "Install")
+                                else -> t("Cập nhật", "Update")
+                            }
+                        )
                     }
                 }
             }

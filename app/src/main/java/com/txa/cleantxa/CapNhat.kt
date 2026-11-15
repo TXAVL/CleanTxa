@@ -350,7 +350,7 @@ object CapNhat {
                                 val tam = File(f.path + ".tam")
                                 tam.writeBytes(bytes)
                                 if (tam.renameTo(f)) {
-                                    TxaLogger.i("Sync", "Updated $targetName from Gathin23/cleanyourtv ($tag)")
+                                    TxaLogger.i("Sync", "Updated $targetName ($tag)")
                                 }
                             }
                         }
@@ -376,6 +376,7 @@ object CapNhat {
                 existingIds.add(mauArr.getJSONObject(i).optString("id"))
             }
             var added = 0
+            val addedModels = mutableListOf<String>()
             for (i in 0 until arr.length()) {
                 val item = arr.optJSONObject(i) ?: continue
                 if (item.optString("type") != "dir") continue
@@ -408,14 +409,16 @@ object CapNhat {
                 val configObj = runCatching {
                     JSONObject(String(tai("https://raw.githubusercontent.com/Gathin23/cleanyourtv/main/examples/$id/config.json", 10), Charsets.UTF_8))
                 }.getOrNull()
+                val ten = id.replace('-', ' ').replaceFirstChar { it.uppercase() }
                 val mauObj = JSONObject()
                     .put("id", id)
-                    .put("ten", id.replace('-', ' ').replaceFirstChar { it.uppercase() })
+                    .put("ten", ten)
                     .put("header", "")
                     .put("goi", goiArr)
                 if (configObj != null) mauObj.put("phim", configObj)
                 mauArr.put(mauObj)
                 existingIds.add(id)
+                addedModels.add("$ten (${goiArr.length()} pkg)")
                 added++
                 if (added >= 20) break
             }
@@ -425,7 +428,10 @@ object CapNhat {
                 tam.writeText(root.toString(), Charsets.UTF_8)
                 if (tam.renameTo(f)) {
                     com.txa.cleantxa.dulieu.DuLieu.lamMoiCache()
-                    TxaLogger.i("Sync", "Merged $added new TV model(s) from Gathin23/cleanyourtv")
+                    TxaLogger.i(
+                        "Sync",
+                        "Merged $added new TV model(s)\n" + addedModels.joinToString("\n") { "• $it" },
+                    )
                 }
             }
         }
