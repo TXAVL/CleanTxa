@@ -31,6 +31,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,8 +58,14 @@ fun LogsScreen(vm: PhienLamViec) {
     val ctx = LocalContext.current
     var selectedLevel by remember { mutableStateOf<LogLevel?>(null) }
     var query by remember { mutableStateOf("") }
+    var showAllConfig by remember { mutableStateOf(false) }
 
     val allLogs = TxaLogger.entries.toList().asReversed()
+    val tvSummary = vm.tvSummaryForLogs()
+    val configPairs = remember(allLogs.size, tvSummary) {
+        TxaLogger.deviceConfigPairs(ctx, tvSummary)
+    }
+    val visibleConfig = if (showAllConfig) configPairs else configPairs.take(6)
     val filtered = remember(allLogs.size, selectedLevel, query) {
         allLogs.filter { e ->
             (selectedLevel == null || e.level == selectedLevel) &&
@@ -73,19 +80,48 @@ fun LogsScreen(vm: PhienLamViec) {
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         TxaCard(highlighted = true) {
-            Text(
-                t("Nhật ký & Cấu hình thiết bị", "Logs & Device Configuration"),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    t("Nhật ký & Cấu hình thiết bị", "Logs & Device Configuration"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                if (configPairs.size > 6) {
+                    TextButton(onClick = { showAllConfig = !showAllConfig }) {
+                        Text(
+                            if (showAllConfig) t("Thu gọn", "Collapse")
+                            else t("Xem tất cả (${configPairs.size})", "Show all (${configPairs.size})"),
+                            fontSize = 12.sp,
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(4.dp))
-            Text(
-                TxaLogger.deviceConfigReport(ctx, vm.tvSummaryForLogs()),
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 6,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                visibleConfig.forEach { (k, v) ->
+                    Row(Modifier.fillMaxWidth()) {
+                        Text(
+                            "$k:",
+                            modifier = Modifier.width(126.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            v,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(10.dp))
             Row(
                 Modifier
@@ -126,10 +162,12 @@ fun LogsScreen(vm: PhienLamViec) {
                     Spacer(Modifier.width(6.dp))
                     Text(t("Chia sẻ", "Share"))
                 }
-                OutlinedButton(onClick = { vm.moManLoiQr() }) {
-                    Icon(Icons.Default.QrCode2, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(t("Web QR (2311)", "Web QR (2311)"))
+                if (com.txa.cleantxa.ManHinh.laTv) {
+                    OutlinedButton(onClick = { vm.moManLoiQr() }) {
+                        Icon(Icons.Default.QrCode2, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(t("Web QR (2311)", "Web QR (2311)"))
+                    }
                 }
                 OutlinedButton(onClick = { TxaLogger.clear(ctx) }) {
                     Icon(Icons.Default.DeleteSweep, null, Modifier.size(16.dp))

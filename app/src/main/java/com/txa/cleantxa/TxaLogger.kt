@@ -1,11 +1,16 @@
 package com.txa.cleantxa
 
+import android.app.ActivityManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
+import android.os.Environment
 import android.os.Process
+import android.os.StatFs
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import org.json.JSONObject
@@ -195,7 +200,6 @@ object TxaLogger {
             entries.clear()
             runCatching { logFile(ctx).delete() }
         }
-        i("Logger", "Logs cleared")
     }
 
     fun localIpv4(): String? = runCatching {
@@ -206,23 +210,71 @@ object TxaLogger {
             ?.hostAddress
     }.getOrNull()
 
-    fun deviceConfigReport(ctx: Context, extraTvInfo: String? = null): String = buildString {
+    private fun networkTransport(ctx: Context): String = runCatching {
+        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val net = cm.activeNetwork ?: return "Offline"
+        val caps = cm.getNetworkCapabilities(net) ?: return "Unknown"
+        when {
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Cellular"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> "VPN"
+            else -> "Other"
+        }
+    }.getOrDefault("Unknown")
+
+    fun deviceConfigPairs(ctx: Context, extraTvInfo: String? = null): List<Pair<String, String>> {
         val now = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+        val dm = ctx.resources.displayMetrics
+        val ramInfo = runCatching {
+            val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val mi = ActivityManager.MemoryInfo()
+            am.getMemoryInfo(mi)
+            val availMb = mi.availMem / (1024L * 1024L)
+            val totalMb = mi.totalMem / (1024L * 1024L)
+            "$availMb / $totalMb MB free${if (mi.lowMemory) " (LOW)" else ""}"
+        }.getOrDefault("Unknown")
+        val storageInfo = runCatching {
+            val st = StatFs(Environment.getDataDirectory().path)
+            val freeMb = st.availableBytes / (1024L * 1024L)
+            val totalMb = st.totalBytes / (1024L * 1024L)
+            "$freeMb / $totalMb MB free"
+        }.getOrDefault("Unknown")
+
+        return buildList {
+            add("Timestamp" to now)
+            add("App" to "CleanTxa ${BuildConfig.VERSION_NAME} (code ${BuildConfig.VERSION_CODE})")
+            add("Package" to ctx.packageName)
+            add("Build Type" to if (BuildConfig.DEBUG) "debug" else "release")
+            add("Mode" to if (ManHinh.laTv) "Android TV / Leanback" else "Phone / Tablet")
+            add("Language" to "${if (NgonNgu.tiengViet) "vi" else "en"} (${Locale.getDefault()})")
+            add("Android OS" to "${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT}, Patch ${Build.VERSION.SECURITY_PATCH})")
+            add("Build ID" to "${Build.DISPLAY} (${Build.ID})")
+            add("Brand / Maker" to "${Build.BRAND} / ${Build.MANUFACTURER}")
+            add("Model / Device" to "${Build.MODEL} (${Build.DEVICE} · ${Build.PRODUCT})")
+            add("Board / Hardware" to "${Build.BOARD} / ${Build.HARDWARE}")
+            add("CPU ABIs" to Build.SUPPORTED_ABIS.joinToString(", "))
+            add("Display" to "${dm.widthPixels}x${dm.heightPixels}px · ${dm.densityDpi}dpi (${dm.density}x)")
+            add("RAM" to ramInfo)
+            add("Storage" to storageInfo)
+            add("Network" to "${networkTransport(ctx)} · IP ${localIpv4() ?: "Unavailable"}")
+            add("Fingerprint" to Build.FINGERPRINT)
+            if (!extraTvInfo.isNullOrBlank()) {
+                extraTvInfo.trim().lines().forEach { line ->
+                    val k = line.substringBefore(':').trim()
+                    val v = line.substringAfter(':', "").trim()
+                    if (k.isNotBlank() && v.isNotBlank()) add(k to v)
+                }
+            }
+        }
+    }
+
+    fun deviceConfigReport(ctx: Context, extraTvInfo: String? = null): String = buildString {
         appendLine("=== CleanTxa Device & App Config ===")
-        appendLine("Timestamp      : $now")
-        appendLine("App            : CleanTxa ${BuildConfig.VERSION_NAME} (code ${BuildConfig.VERSION_CODE})")
-        appendLine("Package        : ${ctx.packageName}")
-        appendLine("Mode           : ${if (ManHinh.laTv) "Android TV / Leanback" else "Phone / Tablet"}")
-        appendLine("Language       : ${if (NgonNgu.tiengViet) "vi" else "en"}")
-        appendLine("Android        : ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
-        appendLine("Device         : ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})")
-        appendLine("Board/Hardware : ${Build.BOARD} / ${Build.HARDWARE}")
-        appendLine("ABIs           : ${Build.SUPPORTED_ABIS.joinToString(", ")}")
-        appendLine("Local IP       : ${localIpv4() ?: "Unavailable"}")
-        if (!extraTvInfo.isNullOrBlank()) {
-            appendLine()
-            appendLine("--- Connected TV Info ---")
-            appendLine(extraTvInfo.trim())
+        val pairs = deviceConfigPairs(ctx, extraTvInfo)
+        val pad = pairs.maxOfOrNull { it.first.length } ?: 16
+        pairs.forEach { (k, v) ->
+            appendLine("${k.padEnd(pad)} : $v")
         }
     }.trim()
 
