@@ -148,7 +148,8 @@ fun CleanTxaApp(vm: PhienLamViec) {
             val downloadedFile = vm.apkDaTai
             val progress = vm.tienTrinhCapNhat
             val step = vm.buocCaiDat
-            val estMinutes = if (b.apkSizeBytes > 0L) ((b.apkSizeBytes / (20L * 1048576L)).toInt() + 1).coerceIn(1, 5) else 1
+            val estMinutes = if (b.apkSizeBytes > 0L) ((b.apkSizeBytes / (20L * 1048576L)).toInt() + 1).coerceAtLeast(1) else 1
+            val estText = com.txa.cleantxa.TxaFormat.durationMinutes(estMinutes)
             AlertDialog(
                 onDismissRequest = { if (!vm.dangCapNhat) vm.hoiCapNhat = false },
                 title = {
@@ -171,8 +172,8 @@ fun CleanTxaApp(vm: PhienLamViec) {
                         ) {
                             Text(
                                 t(
-                                    "Bạn đang dùng bản ${com.txa.cleantxa.BuildConfig.VERSION_NAME}. Cập nhật mất chừng $estMinutes phút, các tivi đã dọn và sao lưu vẫn giữ nguyên.",
-                                    "You're on ${com.txa.cleantxa.BuildConfig.VERSION_NAME}. Updating takes about $estMinutes min; all cleaned TVs and backups stay intact."
+                                    "Bạn đang dùng bản ${com.txa.cleantxa.BuildConfig.VERSION_NAME}. Cập nhật mất chừng ~$estText, các tivi đã dọn và sao lưu vẫn giữ nguyên.",
+                                    "You're on ${com.txa.cleantxa.BuildConfig.VERSION_NAME}. Updating takes about ~$estText; all cleaned TVs and backups stay intact."
                                 ),
                                 modifier = Modifier.padding(10.dp),
                                 style = MaterialTheme.typography.bodySmall,
@@ -197,8 +198,8 @@ fun CleanTxaApp(vm: PhienLamViec) {
                                 if (b.apkSizeBytes > 0L) {
                                     Text(
                                         t(
-                                            "Dung lượng: ${"%.1f".format(b.apkSizeBytes / 1048576.0)} MB",
-                                            "Size: ${"%.1f".format(b.apkSizeBytes / 1048576.0)} MB"
+                                            "Dung lượng: ${com.txa.cleantxa.TxaFormat.bytes(b.apkSizeBytes)}",
+                                            "Size: ${com.txa.cleantxa.TxaFormat.bytes(b.apkSizeBytes)}"
                                         ),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -271,12 +272,7 @@ fun CleanTxaApp(vm: PhienLamViec) {
                                 val speed = progress?.tocDoBytesPerSec ?: 0L
                                 val pct = progress?.phanTram
                                 val eta = progress?.giayConLai
-                                val speedText = when {
-                                    speed >= 1048576L -> "${"%.1f".format(speed / 1048576.0)} MB/s"
-                                    speed >= 1024L -> "${speed / 1024L} KB/s"
-                                    speed > 0L -> "$speed B/s"
-                                    else -> "…"
-                                }
+                                val speedText = com.txa.cleantxa.TxaFormat.speed(speed)
                                 if (tong > 0L) {
                                     LinearProgressIndicator(
                                         progress = { (daTai.toFloat() / tong.toFloat()).coerceIn(0f, 1f) },
@@ -287,7 +283,7 @@ fun CleanTxaApp(vm: PhienLamViec) {
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                     ) {
                                         Text(
-                                            "${pct ?: 0}% · ${"%.1f".format(daTai / 1048576.0)} / ${"%.1f".format(tong / 1048576.0)} MB",
+                                            "${pct ?: 0}% · ${com.txa.cleantxa.TxaFormat.bytes(daTai)} / ${com.txa.cleantxa.TxaFormat.bytes(tong)}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.primary,
                                             fontWeight = FontWeight.SemiBold,
@@ -295,7 +291,7 @@ fun CleanTxaApp(vm: PhienLamViec) {
                                         Text(
                                             buildString {
                                                 append(speedText)
-                                                if (eta != null) append(" · ~${eta}s")
+                                                if (eta != null) append(" · ~${com.txa.cleantxa.TxaFormat.durationSeconds(eta)}")
                                             },
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -305,8 +301,8 @@ fun CleanTxaApp(vm: PhienLamViec) {
                                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                                     Text(
                                         t(
-                                            "Đang tải: ${"%.1f".format(daTai / 1048576.0)} MB · $speedText",
-                                            "Downloading: ${"%.1f".format(daTai / 1048576.0)} MB · $speedText"
+                                            "Đang tải: ${com.txa.cleantxa.TxaFormat.bytes(daTai)} · $speedText",
+                                            "Downloading: ${com.txa.cleantxa.TxaFormat.bytes(daTai)} · $speedText"
                                         ),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.primary,
@@ -328,8 +324,8 @@ fun CleanTxaApp(vm: PhienLamViec) {
                                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                             Text(
                                                 t(
-                                                    "Đã tải xong ${downloadedFile.name} (${"%.1f".format(downloadedFile.length() / 1048576.0)} MB)",
-                                                    "Downloaded ${downloadedFile.name} (${"%.1f".format(downloadedFile.length() / 1048576.0)} MB)"
+                                                    "Đã tải xong ${downloadedFile.name} (${com.txa.cleantxa.TxaFormat.bytes(downloadedFile.length())})",
+                                                    "Downloaded ${downloadedFile.name} (${com.txa.cleantxa.TxaFormat.bytes(downloadedFile.length())})"
                                                 ),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 fontWeight = FontWeight.Bold,

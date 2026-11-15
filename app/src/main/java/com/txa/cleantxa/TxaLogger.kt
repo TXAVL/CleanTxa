@@ -223,23 +223,39 @@ object TxaLogger {
         }
     }.getOrDefault("Unknown")
 
+    private fun ramInfo(ctx: Context): String = runCatching {
+        val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val mi = ActivityManager.MemoryInfo()
+        am.getMemoryInfo(mi)
+        "${TxaFormat.bytes(mi.availMem)} / ${TxaFormat.bytes(mi.totalMem)} free${if (mi.lowMemory) " (LOW)" else ""}"
+    }.getOrDefault("Unknown")
+
+    private fun storageInfo(): String = runCatching {
+        val st = StatFs(Environment.getDataDirectory().path)
+        "${TxaFormat.bytes(st.availableBytes)} / ${TxaFormat.bytes(st.totalBytes)} free"
+    }.getOrDefault("Unknown")
+
+    fun compactConfigPairs(ctx: Context, extraTvInfo: String? = null): List<Pair<String, String>> = buildList {
+        val mode = if (ManHinh.laTv) "TV" else "Phone"
+        add("App" to "CleanTxa ${BuildConfig.VERSION_NAME} ($mode)")
+        add("Device" to "${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
+        add("RAM" to ramInfo(ctx))
+        add("Storage" to storageInfo())
+        add("Network" to "${networkTransport(ctx)} · ${localIpv4() ?: "Unavailable"}")
+        if (!extraTvInfo.isNullOrBlank()) {
+            extraTvInfo.trim().lines().forEach { line ->
+                val k = line.substringBefore(':').trim()
+                val v = line.substringAfter(':', "").trim()
+                if (k.isNotBlank() && v.isNotBlank()) add(k to v)
+            }
+        }
+    }
+
     fun deviceConfigPairs(ctx: Context, extraTvInfo: String? = null): List<Pair<String, String>> {
         val now = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
         val dm = ctx.resources.displayMetrics
-        val ramInfo = runCatching {
-            val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            val mi = ActivityManager.MemoryInfo()
-            am.getMemoryInfo(mi)
-            val availMb = mi.availMem / (1024L * 1024L)
-            val totalMb = mi.totalMem / (1024L * 1024L)
-            "$availMb / $totalMb MB free${if (mi.lowMemory) " (LOW)" else ""}"
-        }.getOrDefault("Unknown")
-        val storageInfo = runCatching {
-            val st = StatFs(Environment.getDataDirectory().path)
-            val freeMb = st.availableBytes / (1024L * 1024L)
-            val totalMb = st.totalBytes / (1024L * 1024L)
-            "$freeMb / $totalMb MB free"
-        }.getOrDefault("Unknown")
+        val ram = ramInfo(ctx)
+        val storage = storageInfo()
 
         return buildList {
             add("Timestamp" to now)
@@ -254,9 +270,9 @@ object TxaLogger {
             add("Model / Device" to "${Build.MODEL} (${Build.DEVICE} · ${Build.PRODUCT})")
             add("Board / Hardware" to "${Build.BOARD} / ${Build.HARDWARE}")
             add("CPU ABIs" to Build.SUPPORTED_ABIS.joinToString(", "))
-            add("Display" to "${dm.widthPixels}x${dm.heightPixels}px · ${dm.densityDpi}dpi (${dm.density}x)")
-            add("RAM" to ramInfo)
-            add("Storage" to storageInfo)
+            add("Display" to "${dm.widthPixels}x${dm.heightPixels}px · ${dm.densityDpi}dpi (${TxaFormat.number2f(dm.density)}x)")
+            add("RAM" to ram)
+            add("Storage" to storage)
             add("Network" to "${networkTransport(ctx)} · IP ${localIpv4() ?: "Unavailable"}")
             add("Fingerprint" to Build.FINGERPRINT)
             if (!extraTvInfo.isNullOrBlank()) {

@@ -119,11 +119,12 @@ fun TvInfoScreen(vm: PhienLamViec) {
             vm.boNho?.let { (free, total) ->
                 if (total > 0) {
                     val used = (total - free).coerceAtLeast(0)
-                    val freeMb = free / (1024 * 1024)
-                    val totalMb = total / (1024 * 1024)
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        t("Bộ nhớ trống: ${freeMb} MB / ${totalMb} MB", "Free storage: ${freeMb} MB / ${totalMb} MB"),
+                        t(
+                            "Bộ nhớ trống: ${com.txa.cleantxa.TxaFormat.bytes(free)} / ${com.txa.cleantxa.TxaFormat.bytes(total)}",
+                            "Free storage: ${com.txa.cleantxa.TxaFormat.bytes(free)} / ${com.txa.cleantxa.TxaFormat.bytes(total)}"
+                        ),
                         style = MaterialTheme.typography.labelMedium,
                     )
                     Spacer(Modifier.height(4.dp))

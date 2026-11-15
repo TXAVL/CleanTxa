@@ -58,14 +58,12 @@ fun LogsScreen(vm: PhienLamViec) {
     val ctx = LocalContext.current
     var selectedLevel by remember { mutableStateOf<LogLevel?>(null) }
     var query by remember { mutableStateOf("") }
-    var showAllConfig by remember { mutableStateOf(false) }
-
+    val isTv = com.txa.cleantxa.ManHinh.laTv
     val allLogs = TxaLogger.entries.toList().asReversed()
     val tvSummary = vm.tvSummaryForLogs()
-    val configPairs = remember(allLogs.size, tvSummary) {
-        TxaLogger.deviceConfigPairs(ctx, tvSummary)
+    val compactConfig = remember(allLogs.size, tvSummary) {
+        TxaLogger.compactConfigPairs(ctx, tvSummary)
     }
-    val visibleConfig = if (showAllConfig) configPairs else configPairs.take(6)
     val filtered = remember(allLogs.size, selectedLevel, query) {
         allLogs.filter { e ->
             (selectedLevel == null || e.level == selectedLevel) &&
@@ -80,33 +78,18 @@ fun LogsScreen(vm: PhienLamViec) {
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         TxaCard(highlighted = true) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    t("Nhật ký & Cấu hình thiết bị", "Logs & Device Configuration"),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                if (configPairs.size > 6) {
-                    TextButton(onClick = { showAllConfig = !showAllConfig }) {
-                        Text(
-                            if (showAllConfig) t("Thu gọn", "Collapse")
-                            else t("Xem tất cả (${configPairs.size})", "Show all (${configPairs.size})"),
-                            fontSize = 12.sp,
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(4.dp))
+            Text(
+                t("Nhật ký & Cấu hình thiết bị", "Logs & Device Configuration"),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(6.dp))
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                visibleConfig.forEach { (k, v) ->
+                compactConfig.forEach { (k, v) ->
                     Row(Modifier.fillMaxWidth()) {
                         Text(
                             "$k:",
-                            modifier = Modifier.width(126.dp),
+                            modifier = Modifier.width(86.dp),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary,
@@ -122,6 +105,15 @@ fun LogsScreen(vm: PhienLamViec) {
                     }
                 }
             }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                t(
+                    "Bấm «Copy tất cả» để sao chép đầy đủ cấu hình thiết bị & logs.",
+                    "Tap «Copy all» to copy full device configuration & logs."
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
             Spacer(Modifier.height(10.dp))
             Row(
                 Modifier
