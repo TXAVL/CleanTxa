@@ -1,50 +1,6 @@
-CleanTV — AlexVGS / Vietnam Gaming Setup, 2026.
-Phần mềm miễn phí, cung cấp nguyên trạng, không kèm bảo hành. / Free software, provided "as is", without warranty.
-
-SỐ LIỆU ẨN DANH / ANONYMOUS STATS
-Để biết app được dùng bao nhiêu và tivi nào hay lỗi, app gửi về máy chủ VGS (Cloudflare) khi: mở app (mỗi ngày
-một lần), cập nhật app, dọn tivi xong, cài Home sạch, khôi phục, ghim nút máy chiếu, bật/tắt khoá trẻ em (chỉ
-số khung giờ, không gửi giờ hay PIN). Nội dung gửi: một mã máy
-ngẫu nhiên do app tự sinh, số bản app, tên mẫu tivi (hãng, model, phiên bản Android), số gói đã tắt. KHÔNG gửi
-email, tên, danh sách app, địa chỉ IP hay vị trí. Lượt tải APK chỉ được đếm, không lưu IP.
-To see how the app is used and which TVs have problems, it sends a random app-generated ID, the app version,
-the TV model and how many packages were disabled when you open the app (once a day), update, clean a TV,
-install the clean Home, restore, pin projector buttons or switch the kids lock (just how many periods; never the
-times or the PIN). No email, name, app list, IP address or location.
-GỬI DANH SÁCH GÓI (CHỈ KHI BẠN BẤM) / PACKAGE LIST (ONLY WHEN YOU TAP)
-Nút "Gửi danh sách gói cho VGS" ở màn cuối gửi model tivi, phiên bản Android, danh sách gói đang tắt trên tivi,
-đánh giá và ghi chú bạn viết (cùng email/Zalo nếu bạn tự ghi), kèm vài dòng chẩn đoán màn Home (Home mặc định,
-app nhận Home, màn đang hiện), để VGS làm danh sách mẫu cho tivi cùng dòng.
-The "Send the package list to VGS" button on the last screen sends the TV model, Android version, the packages
-that are off on the TV, your rating and note (and a contact only if you type one) plus a few Home diagnostics
-(default Home, apps answering Home, the screen in front), to build lists for the same TV.
-
-CleanTV dùng các phần mềm mã nguồn mở sau. / CleanTV uses the following open-source software.
-
-1. CleanYourTV — danh sách 147 mẫu tivi và màn Home sạch (launcher), có sửa thêm dòng thời tiết
-   và tuỳ chọn ẩn dải dock / TV lists and the clean Home launcher, modified (weather line, dock band option)
-   https://github.com/Gathin23/cleanyourtv — MIT License (văn bản ở mục A / text in section A)
-2. LibADB Android — Muntashir Al-Islam — https://github.com/MuntashirAkon/libadb-android
-   Apache License 2.0 (mục B / section B)
-3. Conscrypt — Google — https://github.com/google/conscrypt — Apache License 2.0 (mục B)
-4. AndroidX, Jetpack Compose, Kotlin — Google / JetBrains — Apache License 2.0 (mục B)
-5. Bouncy Castle — Legion of the Bouncy Castle Inc. — https://www.bouncycastle.org — MIT License
-6. Phông chữ Lexend (trong Home sạch, thay Outfit vì đủ dấu tiếng Việt) / Lexend font (in the clean Home)
-   The Lexend Project Authors — https://github.com/googlefonts/lexend — SIL Open Font License 1.1 (mục C / section C)
-7. Dữ liệu thời tiết / Weather data: Open-Meteo.com — https://open-meteo.com — CC BY 4.0
-   Toạ độ phường/xã / Ward locations: © OpenStreetMap contributors — https://www.openstreetmap.org/copyright — ODbL 1.0
-8. DNS chặn quảng cáo (tuỳ chọn) / Optional ad-blocking DNS: AdGuard DNS — https://adguard-dns.io
-
-Tên các hãng tivi chỉ dùng để nói tivi nào chạy được; CleanTV không liên quan tới các hãng đó.
-TV brand names are only used to describe compatibility; CleanTV is not affiliated with them.
-
 ======================================================================
-A. MIT License (CleanYourTV)
+A. MIT License (Bouncy Castle / Open-Source Components)
 ======================================================================
-MIT License
-
-Copyright (c) 2026 Gathin
-
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
@@ -62,12 +18,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-The Outfit typeface in launcher/app/src/main/res/font/outfit.ttf is copyright
-The Outfit Project Authors and licensed under the SIL Open Font License 1.1,
-see launcher/FONT-LICENSE-OFL.txt.
 
 ======================================================================
 B. Apache License 2.0
