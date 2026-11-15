@@ -239,8 +239,14 @@ object CapNhat {
     @Volatile
     var moTuThongBao = false
 
+    private val downloadLock = Any()
+
     /** Tải APK bản mới vào cache với callback tiến trình (bytes đã tải, tổng bytes, tốc độ bytes/s). */
-    fun taiApk(ctx: Context, ban: BanMoi, onProgress: (TaiTienTrinh) -> Unit = {}): File {
+    fun taiApk(ctx: Context, ban: BanMoi, onProgress: (TaiTienTrinh) -> Unit = {}): File = synchronized(downloadLock) {
+        fileApkDaTai(ctx, ban)?.let { cached ->
+            onProgress(TaiTienTrinh(cached.length(), cached.length(), 0L))
+            return@synchronized cached
+        }
         val f = File(ctx.cacheDir, "cap-nhat/CleanTxa-${ban.versionName}.apk").apply { parentFile?.mkdirs() }
         val tam = File(f.path + ".tam")
         val c = URL(ban.apk).openConnection() as HttpURLConnection
@@ -276,8 +282,15 @@ object CapNhat {
             val elapsedSec = ((System.currentTimeMillis() - startedAt).coerceAtLeast(1L)) / 1000.0
             onProgress(TaiTienTrinh(daTai, tong, (daTai / elapsedSec).toLong()))
             if (f.exists()) f.delete()
-            if (!tam.renameTo(f)) error("Không lưu được file APK")
-            return f
+            if (!tam.renameTo(f)) {
+                runCatching {
+                    tam.copyTo(f, overwrite = true)
+                    tam.delete()
+                }.getOrElse {
+                    error("Không lưu được file APK")
+                }
+            }
+            f
         } finally {
             c.disconnect()
         }
