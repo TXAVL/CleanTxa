@@ -24,8 +24,21 @@ object CapNhat {
         val apk: String,
         val ghiChuVi: String,
         val ghiChuEn: String = ghiChuVi,
+        val apkName: String = "CleanTxa-$versionName.apk",
+        val apkSizeBytes: Long = -1L,
+        val publishedAt: String = "",
+        val releaseUrl: String = "",
     ) {
         val ghiChu: String get() = t(ghiChuVi, ghiChuEn)
+    }
+
+    data class TaiTienTrinh(
+        val daTai: Long = 0L,
+        val tong: Long = -1L,
+        val tocDoBytesPerSec: Long = 0L,
+    ) {
+        val phanTram: Int? get() = if (tong > 0L) ((daTai * 100L) / tong).toInt().coerceIn(0, 100) else null
+        val giayConLai: Long? get() = if (tong > daTai && tocDoBytesPerSec > 0L) (tong - daTai) / tocDoBytesPerSec else null
     }
 
     /** File dữ liệu đã tải về (nếu có) — DuLieu và launcher đọc file này trước assets. */
@@ -121,12 +134,18 @@ object CapNhat {
         if (soSanhPhienBan(ver, BuildConfig.VERSION_NAME) <= 0) return null
         val assets = rel.optJSONArray("assets") ?: return null
         var apkUrl: String? = null
+        var apkName = "CleanTxa-$ver.apk"
+        var apkSize = -1L
         for (i in 0 until assets.length()) {
             val a = assets.optJSONObject(i) ?: continue
             val name = a.optString("name")
             if (name.endsWith(".apk", ignoreCase = true)) {
                 apkUrl = a.optString("browser_download_url").takeIf { it.startsWith("http") }
-                break
+                if (apkUrl != null) {
+                    apkName = name
+                    apkSize = a.optLong("size", -1L)
+                    break
+                }
             }
         }
         val url = apkUrl ?: return null
@@ -138,6 +157,10 @@ object CapNhat {
             apk = url,
             ghiChuVi = vi,
             ghiChuEn = en,
+            apkName = apkName,
+            apkSizeBytes = apkSize,
+            publishedAt = rel.optString("published_at").take(16).replace('T', ' '),
+            releaseUrl = rel.optString("html_url"),
         )
     }
 
@@ -216,8 +239,8 @@ object CapNhat {
     @Volatile
     var moTuThongBao = false
 
-    /** Tải APK bản mới vào cache với callback tiến trình (bytes đã tải, tổng bytes). */
-    fun taiApk(ctx: Context, ban: BanMoi, onProgress: (Long, Long) -> Unit = { _, _ -> }): File {
+    /** Tải APK bản mới vào cache với callback tiến trình (bytes đã tải, tổng bytes, tốc độ bytes/s). */
+    fun taiApk(ctx: Context, ban: BanMoi, onProgress: (TaiTienTrinh) -> Unit = {}): File {
         val f = File(ctx.cacheDir, "cap-nhat/CleanTxa-${ban.versionName}.apk").apply { parentFile?.mkdirs() }
         val tam = File(f.path + ".tam")
         val c = URL(ban.apk).openConnection() as HttpURLConnection
@@ -227,8 +250,11 @@ object CapNhat {
         c.setRequestProperty("User-Agent", "CleanTxa/${BuildConfig.VERSION_NAME}")
         try {
             if (c.responseCode != 200) error("HTTP ${c.responseCode} ${ban.apk}")
-            val tong = c.contentLengthLong
+            val tong = c.contentLengthLong.takeIf { it > 0L } ?: ban.apkSizeBytes
             var daTai = 0L
+            val startedAt = System.currentTimeMillis()
+            var lastNotify = 0L
+            onProgress(TaiTienTrinh(0L, tong, 0L))
             c.inputStream.use { inp ->
                 tam.outputStream().use { out ->
                     val buf = ByteArray(16 * 1024)
@@ -237,10 +263,18 @@ object CapNhat {
                         if (n <= 0) break
                         out.write(buf, 0, n)
                         daTai += n
-                        onProgress(daTai, tong)
+                        val now = System.currentTimeMillis()
+                        if (now - lastNotify >= 150L) {
+                            val elapsedSec = ((now - startedAt).coerceAtLeast(1L)) / 1000.0
+                            val speed = (daTai / elapsedSec).toLong()
+                            onProgress(TaiTienTrinh(daTai, tong, speed))
+                            lastNotify = now
+                        }
                     }
                 }
             }
+            val elapsedSec = ((System.currentTimeMillis() - startedAt).coerceAtLeast(1L)) / 1000.0
+            onProgress(TaiTienTrinh(daTai, tong, (daTai / elapsedSec).toLong()))
             if (f.exists()) f.delete()
             if (!tam.renameTo(f)) error("Không lưu được file APK")
             return f

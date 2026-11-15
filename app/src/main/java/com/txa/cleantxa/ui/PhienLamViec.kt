@@ -505,7 +505,7 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     var banMoi by mutableStateOf<com.txa.cleantxa.CapNhat.BanMoi?>(null)
     var dangCapNhat by mutableStateOf(false)
     var hoiCapNhat by mutableStateOf(false)
-    var tienTrinhCapNhat by mutableStateOf<Pair<Long, Long>?>(null)
+    var tienTrinhCapNhat by mutableStateOf<com.txa.cleantxa.CapNhat.TaiTienTrinh?>(null)
     var apkDaTai by mutableStateOf<java.io.File?>(null)
     var loiCapNhat by mutableStateOf("")
 
@@ -550,7 +550,7 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         hoiCapNhat = true
         dangCapNhat = true
         loiCapNhat = ""
-        tienTrinhCapNhat = 0L to -1L
+        tienTrinhCapNhat = com.txa.cleantxa.CapNhat.TaiTienTrinh(0L, b.apkSizeBytes, 0L)
         viewModelScope.launch {
             try {
                 if (android.os.Build.VERSION.SDK_INT >= 26 && !ctx.packageManager.canRequestPackageInstalls()) {
@@ -575,8 +575,8 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 val file = io {
-                    com.txa.cleantxa.CapNhat.taiApk(ctx, b) { daTai, tong ->
-                        tienTrinhCapNhat = daTai to tong
+                    com.txa.cleantxa.CapNhat.taiApk(ctx, b) { prog ->
+                        tienTrinhCapNhat = prog
                     }
                 }
                 apkDaTai = file

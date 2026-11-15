@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -149,39 +150,102 @@ fun CleanTxaApp(vm: PhienLamViec) {
             AlertDialog(
                 onDismissRequest = { if (!vm.dangCapNhat) vm.hoiCapNhat = false },
                 title = {
-                    Text(t("Đã có CleanTxa ${b.versionName}", "CleanTxa ${b.versionName} is out"))
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(t("Cập nhật CleanTxa ${b.versionName}", "Update CleanTxa ${b.versionName}"))
+                        Text(
+                            "v${com.txa.cleantxa.BuildConfig.VERSION_NAME} → v${b.versionName}" +
+                                if (b.publishedAt.isNotBlank()) " · ${b.publishedAt}" else "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            b.ghiChu.ifBlank {
-                                t("Bạn có muốn tải và cài đặt bản cập nhật mới ngay không?", "Download and install the new update now?")
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(
+                                Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(3.dp),
+                            ) {
+                                Text(
+                                    t("Gói cài đặt: ${b.apkName}", "Package: ${b.apkName}"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                if (b.apkSizeBytes > 0L) {
+                                    Text(
+                                        t(
+                                            "Dung lượng: ${"%.1f".format(b.apkSizeBytes / 1048576.0)} MB",
+                                            "Size: ${"%.1f".format(b.apkSizeBytes / 1048576.0)} MB"
+                                        ),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 200.dp)
+                                .verticalScroll(rememberScrollState()),
+                        ) {
+                            Text(
+                                b.ghiChu.ifBlank {
+                                    t("Bạn có muốn tải và cài đặt bản cập nhật mới ngay không?", "Download and install the new update now?")
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+
                         when {
                             vm.dangCapNhat -> {
-                                val daTai = progress?.first ?: 0L
-                                val tong = progress?.second ?: -1L
+                                val daTai = progress?.daTai ?: 0L
+                                val tong = progress?.tong ?: b.apkSizeBytes
+                                val speed = progress?.tocDoBytesPerSec ?: 0L
+                                val pct = progress?.phanTram
+                                val eta = progress?.giayConLai
+                                val speedText = when {
+                                    speed >= 1048576L -> "${"%.1f".format(speed / 1048576.0)} MB/s"
+                                    speed >= 1024L -> "${speed / 1024L} KB/s"
+                                    speed > 0L -> "$speed B/s"
+                                    else -> "…"
+                                }
                                 if (tong > 0L) {
                                     LinearProgressIndicator(
                                         progress = { (daTai.toFloat() / tong.toFloat()).coerceIn(0f, 1f) },
                                         modifier = Modifier.fillMaxWidth(),
                                     )
-                                    Text(
-                                        t(
-                                            "Đang tải: ${"%.1f".format(daTai / 1048576.0)} / ${"%.1f".format(tong / 1048576.0)} MB",
-                                            "Downloading: ${"%.1f".format(daTai / 1048576.0)} / ${"%.1f".format(tong / 1048576.0)} MB"
-                                        ),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
+                                    Row(
+                                        Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Text(
+                                            "${pct ?: 0}% · ${"%.1f".format(daTai / 1048576.0)} / ${"%.1f".format(tong / 1048576.0)} MB",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                        Text(
+                                            buildString {
+                                                append(speedText)
+                                                if (eta != null) append(" · ~${eta}s")
+                                            },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 } else {
                                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                                     Text(
                                         t(
-                                            "Đang tải: ${"%.1f".format(daTai / 1048576.0)} MB…",
-                                            "Downloading: ${"%.1f".format(daTai / 1048576.0)} MB…"
+                                            "Đang tải: ${"%.1f".format(daTai / 1048576.0)} MB · $speedText",
+                                            "Downloading: ${"%.1f".format(daTai / 1048576.0)} MB · $speedText"
                                         ),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.primary,
@@ -190,7 +254,7 @@ fun CleanTxaApp(vm: PhienLamViec) {
                             }
                             downloadedFile != null -> {
                                 Surface(
-                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
                                     shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
@@ -199,15 +263,25 @@ fun CleanTxaApp(vm: PhienLamViec) {
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
-                                        Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                        Text(
-                                            t(
-                                                "Đã tải xong ${downloadedFile.name} (${"%.1f".format(downloadedFile.length() / 1048576.0)} MB) — sẵn sàng cài đặt.",
-                                                "Downloaded ${downloadedFile.name} (${"%.1f".format(downloadedFile.length() / 1048576.0)} MB) — ready to install."
-                                            ),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                        )
+                                        Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            Text(
+                                                t(
+                                                    "Đã tải xong ${downloadedFile.name} (${"%.1f".format(downloadedFile.length() / 1048576.0)} MB)",
+                                                    "Downloaded ${downloadedFile.name} (${"%.1f".format(downloadedFile.length() / 1048576.0)} MB)"
+                                                ),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Bold,
+                                            )
+                                            Text(
+                                                t(
+                                                    "Lưu tại: cache/cap-nhat/${downloadedFile.name} — sẵn sàng cài đặt.",
+                                                    "Saved to: cache/cap-nhat/${downloadedFile.name} — ready to install."
+                                                ),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
                                     }
                                 }
                             }
