@@ -1,6 +1,7 @@
 package com.txa.cleantxa.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,9 +21,12 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.SettingsRemote
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
@@ -176,6 +180,63 @@ fun HomeScreen(vm: PhienLamViec) {
                     Icon(Icons.Default.SettingsRemote, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(t("Kết nối lại nhanh (${vm.ip})", "Quick reconnect (${vm.ip})"))
+                }
+            }
+        }
+
+        // Quick Tools (shown on both TV Launcher and Phone app)
+        TxaCard(
+            title = t("Tiện ích nhanh", "Quick tools"),
+            subtitle = t(
+                "Mở nhanh tăng tốc TV, nhật ký hệ thống và kiểm tra bản mới.",
+                "Quickly open TV speed boost, system logs, and update check.",
+            ),
+        ) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        if (vm.thongTin != null) {
+                            vm.man = Man.THONG_TIN
+                        } else if (ManHinh.laTv || vm.ip.isNotBlank()) {
+                            vm.man = Man.KET_NOI
+                            vm.ketNoi()
+                        } else {
+                            vm.datLai()
+                            vm.man = Man.KET_NOI
+                        }
+                    },
+                ) {
+                    Icon(Icons.Default.Speed, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(t("Tăng tốc TV", "TV Speed Boost"))
+                }
+                OutlinedButton(onClick = { vm.moLogs() }) {
+                    Icon(Icons.Default.Terminal, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(t("Nhật ký", "Logs"))
+                }
+                if (ManHinh.laTv) {
+                    OutlinedButton(onClick = { vm.moManLoiQr() }) {
+                        Icon(Icons.Default.QrCode2, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(t("Web QR (2311)", "Web QR (2311)"))
+                    }
+                }
+                OutlinedButton(
+                    onClick = { vm.kiemTraCapNhatThuCong() },
+                    enabled = !vm.dangKiemTraCapNhat && !vm.dangCapNhat,
+                ) {
+                    Icon(Icons.Default.SystemUpdate, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (vm.dangKiemTraCapNhat) t("Đang kiểm tra…", "Checking…")
+                        else t("Kiểm tra cập nhật", "Check updates")
+                    )
                 }
             }
         }

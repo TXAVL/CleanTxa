@@ -505,6 +505,7 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     var dsSaoLuu by mutableStateOf<List<BanSaoLuu>>(emptyList())
 
     var banMoi by mutableStateOf<com.txa.cleantxa.CapNhat.BanMoi?>(null)
+    var dangKiemTraCapNhat by mutableStateOf(false)
     var dangCapNhat by mutableStateOf(false)
     var hoiCapNhat by mutableStateOf(false)
     var tienTrinhCapNhat by mutableStateOf<com.txa.cleantxa.CapNhat.TaiTienTrinh?>(null)
@@ -553,6 +554,35 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         } else if (p.getInt("da_hoi", 0) < b.versionCode) {
             p.edit().putInt("da_hoi", b.versionCode).putInt("da_bao", maxOf(p.getInt("da_bao", 0), b.versionCode)).apply()
             hoiCapNhat = true
+        }
+    }
+
+    fun kiemTraCapNhatThuCong() {
+        if (dangKiemTraCapNhat || dangCapNhat) return
+        dangKiemTraCapNhat = true
+        viewModelScope.launch {
+            try {
+                val b = runCatching { io { com.txa.cleantxa.CapNhat.kiemTraApp() } }.getOrNull()
+                banMoi = b
+                if (b != null) {
+                    com.txa.cleantxa.CapNhat.fileApkDaTai(ctx, b)?.let { cached ->
+                        apkDaTai = cached
+                        buocCaiDat = BuocCaiDat.SAN_SANG_CAI
+                    }
+                    hoiCapNhat = true
+                } else {
+                    android.widget.Toast.makeText(
+                        ctx,
+                        t(
+                            "Bạn đang dùng bản mới nhất (v${com.txa.cleantxa.BuildConfig.VERSION_NAME}).",
+                            "You're on the latest version (v${com.txa.cleantxa.BuildConfig.VERSION_NAME}).",
+                        ),
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            } finally {
+                dangKiemTraCapNhat = false
+            }
         }
     }
 
