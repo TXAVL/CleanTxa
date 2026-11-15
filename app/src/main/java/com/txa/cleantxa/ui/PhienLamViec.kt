@@ -7,6 +7,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.ConnectivityManager
 import android.net.LinkProperties
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -119,6 +122,8 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     var dangQuet by mutableStateOf(false)
     var ghepIpCong by mutableStateOf("")
     var ghepMa by mutableStateOf("")
+    var dangTimGhep by mutableStateOf(false)
+    val dsGhepTimThay = mutableStateListOf<String>()
 
     // Tivi
     var thongTin by mutableStateOf<ThongTinTv?>(null)
@@ -776,8 +781,69 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         if (com.txa.cleantxa.ManHinh.laTv) io { runCatching { adb.shell("am start -n ${ctx.packageName}/com.txa.cleantxa.MainActivity") } }
     }
 
+    /** Tự tìm IP & cổng ghép đôi Gỡ lỗi không dây (_adb-tls-pairing._tcp.) qua mDNS. */
+    fun tuTimGhepDoi() {
+        if (dangTimGhep) return
+        dangTimGhep = true
+        dsGhepTimThay.clear()
+        loi = ""
+        viewModelScope.launch {
+            val wifi = ctx.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            val lock = runCatching { wifi?.createMulticastLock("cleantxa_pair")?.apply { acquire() } }.getOrNull()
+            val nsd = ctx.getSystemService(Context.NSD_SERVICE) as? NsdManager
+            if (nsd == null) {
+                runCatching { lock?.release() }
+                dangTimGhep = false
+                return@launch
+            }
+            var firstFoundAt = 0L
+            val discoveryListener = object : NsdManager.DiscoveryListener {
+                override fun onDiscoveryStarted(regType: String) {}
+                override fun onDiscoveryStopped(serviceType: String) {}
+                override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {}
+                override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
+                override fun onServiceLost(serviceInfo: NsdServiceInfo) {}
+                override fun onServiceFound(serviceInfo: NsdServiceInfo) {
+                    @Suppress("DEPRECATION")
+                    runCatching {
+                        nsd.resolveService(serviceInfo, object : NsdManager.ResolveListener {
+                            override fun onResolveFailed(si: NsdServiceInfo, errorCode: Int) {}
+                            override fun onServiceResolved(resolved: NsdServiceInfo) {
+                                @Suppress("DEPRECATION")
+                                val host = resolved.host?.hostAddress ?: return
+                                val port = resolved.port
+                                if (port <= 0) return
+                                val addr = "$host:$port"
+                                viewModelScope.launch(Dispatchers.Main) {
+                                    if (addr !in dsGhepTimThay) dsGhepTimThay += addr
+                                    if (ghepIpCong.isBlank()) ghepIpCong = addr
+                                    if (firstFoundAt == 0L) firstFoundAt = System.currentTimeMillis()
+                                }
+                            }
+                        })
+                    }
+                }
+            }
+            try {
+                runCatching {
+                    nsd.discoverServices("_adb-tls-pairing._tcp.", NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+                }
+                val start = System.currentTimeMillis()
+                while (System.currentTimeMillis() - start < 10_000L) {
+                    kotlinx.coroutines.delay(250L)
+                    if (firstFoundAt > 0L && System.currentTimeMillis() - firstFoundAt >= 800L) break
+                }
+            } finally {
+                runCatching { nsd.stopServiceDiscovery(discoveryListener) }
+                runCatching { lock?.release() }
+                dangTimGhep = false
+            }
+        }
+    }
+
     /** Ghép đôi Gỡ lỗi không dây (Android 11+), rồi tìm cổng kết nối qua mDNS. */
     fun ghepDoi() = chay(t("Đang ghép đôi…", "Pairing…")) {
+        if (ghepIpCong.isBlank() && dsGhepTimThay.isNotEmpty()) ghepIpCong = dsGhepTimThay.first()
         val (h, p) = tachIpCong(ghepIpCong) ?: error(t("Nhập dạng 192.168.1.20:37123 (IP và cổng trong hộp ghép đôi).", "Enter it as 192.168.1.20:37123 (IP and port from the pairing dialog)."))
         val ma = ghepMa.trim()
         if (ma.length != 6) error(t("Mã ghép đôi có 6 số.", "The pairing code has 6 digits."))

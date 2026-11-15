@@ -45,6 +45,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -187,6 +188,11 @@ fun ConnectScreen(vm: PhienLamViec) {
             title = t("Ghép đôi bằng mã 6 số (Google TV mới)", "Pair with 6-digit code (Newer Google TV)"),
             icon = Icons.Default.Key,
         ) {
+            LaunchedEffect(Unit) {
+                if (vm.ghepIpCong.isBlank() && !vm.dangTimGhep) {
+                    vm.tuTimGhepDoi()
+                }
+            }
             Text(
                 t(
                     "Trên tivi: Cài đặt → Hệ thống → Tùy chọn nhà phát triển → Gỡ lỗi qua Wi-Fi → Ghép nối thiết bị bằng mã ghép nối.",
@@ -195,6 +201,38 @@ fun ConnectScreen(vm: PhienLamViec) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = { vm.tuTimGhepDoi() },
+                enabled = !vm.dangTimGhep && !vm.dangBan,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (vm.dangTimGhep) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(t("Đang tự tìm IP & cổng ghép đôi…", "Auto-detecting pairing IP & port…"))
+                } else {
+                    Icon(Icons.Default.Radar, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(t("Tự tìm IP & cổng ghép đôi", "Auto-detect pairing IP & port"))
+                }
+            }
+            AnimatedVisibility(
+                visible = vm.dsGhepTimThay.isNotEmpty(),
+                enter = fadeIn() + expandVertically(),
+            ) {
+                Column {
+                    Spacer(Modifier.height(8.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        vm.dsGhepTimThay.forEach { addr ->
+                            AssistChip(
+                                onClick = { vm.ghepIpCong = addr },
+                                label = { Text(addr) },
+                            )
+                        }
+                    }
+                }
+            }
             Spacer(Modifier.height(10.dp))
             OutlinedTextField(
                 value = vm.ghepIpCong,
