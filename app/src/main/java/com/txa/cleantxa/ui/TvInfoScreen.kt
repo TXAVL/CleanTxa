@@ -1,6 +1,7 @@
 package com.txa.cleantxa.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,15 +21,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SettingsRemote
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -147,6 +152,90 @@ fun TvInfoScreen(vm: PhienLamViec) {
                     }
                 }
             }
+        }
+
+        var hoiKhoiDongLai by remember { mutableStateOf(false) }
+
+        TxaCard(
+            title = t("Tối ưu & Tăng tốc TV", "TV Speed & Optimization"),
+            subtitle = t("Giảm hiệu ứng chuyển cảnh giúp TV phản hồi nhanh hơn, dọn RAM nền hoặc khởi động lại nhanh.", "Reduce transition animations for snappier UI, trim background RAM, or reboot quickly."),
+        ) {
+            Text(
+                t("Tốc độ hiệu ứng hệ thống", "System animation scale"),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(6.dp))
+            val curScale = vm.tiLeHieuUng?.toDoubleOrNull()
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                listOf(
+                    "0" to t("0x (Tắt)", "0x (Off)"),
+                    "0.5" to t("0.5x (Nhanh)", "0.5x (Fast)"),
+                    "1" to t("1x (Mặc định)", "1x (Default)"),
+                ).forEach { (scale, label) ->
+                    val active = curScale != null && kotlin.math.abs(curScale - scale.toDouble()) < 0.05
+                    FilterChip(
+                        selected = active,
+                        onClick = { vm.datTiLeHieuUng(scale) },
+                        enabled = !vm.dangBan,
+                        leadingIcon = { Icon(Icons.Default.Speed, null, Modifier.size(16.dp)) },
+                        label = { Text(label) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(onClick = { vm.giaiPhongRamNen() }, enabled = !vm.dangBan) {
+                    Icon(Icons.Default.Memory, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(t("Giải phóng RAM nền", "Free background RAM"))
+                }
+                OutlinedButton(onClick = { hoiKhoiDongLai = true }, enabled = !vm.dangBan) {
+                    Icon(Icons.Default.RestartAlt, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(t("Khởi động lại TV", "Reboot TV"))
+                }
+            }
+        }
+
+        if (hoiKhoiDongLai) {
+            AlertDialog(
+                onDismissRequest = { hoiKhoiDongLai = false },
+                title = { Text(t("Khởi động lại TV?", "Reboot TV?")) },
+                text = {
+                    Text(
+                        t(
+                            "TV sẽ khởi động lại ngay và ngắt kết nối ADB tạm thời. Sau khi TV bật lại, bạn kết nối lại như bình thường.",
+                            "The TV will reboot immediately and ADB will disconnect temporarily. Reconnect once the TV boots back up."
+                        )
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            hoiKhoiDongLai = false
+                            vm.khoiDongLaiTv()
+                        },
+                    ) {
+                        Text(t("Khởi động lại", "Reboot"))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { hoiKhoiDongLai = false }) {
+                        Text(t("Huỷ", "Cancel"))
+                    }
+                },
+            )
         }
 
         TxaCard(

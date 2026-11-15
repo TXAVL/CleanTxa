@@ -55,6 +55,24 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
         return boNhoTrong()
     }
 
+    /** Đọc tỉ lệ hiệu ứng cửa sổ hiện tại (0, 0.5, 1.0...); null nếu không đọc được. */
+    fun docTiLeHieuUng(): String? = runCatching {
+        val raw = sh("settings get global window_animation_scale").trim()
+        if (raw.isBlank() || raw.equals("null", ignoreCase = true)) null else raw
+    }.getOrNull()
+
+    /** Đặt tỉ lệ hiệu ứng hệ thống (window, transition, animator) giúp TV phản hồi mượt hơn. */
+    fun datTiLeHieuUng(scale: String): Boolean = runCatching {
+        sh("settings put global window_animation_scale $scale && settings put global transition_animation_scale $scale && settings put global animator_duration_scale $scale")
+        true
+    }.getOrDefault(false)
+
+    /** Giải phóng RAM nền bằng am kill-all (không đụng app đang mở). */
+    fun giaiPhongRamNen(): Boolean = runCatching {
+        sh("am kill-all")
+        true
+    }.getOrDefault(false)
+
     /**
      * App chiếm nhiều chỗ nhất (dumpsys diskstats, Android tự tính định kỳ nên có thể cũ vài giờ), trừ gói lõi. Cho người
      * dùng gỡ bản cập nhật / xoá dữ liệu ngay trong CleanTxa khi tivi hết chỗ (sohuyet8, Sony BRAVIA 0 MB, 02/11/2026).

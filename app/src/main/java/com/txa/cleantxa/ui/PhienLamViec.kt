@@ -127,6 +127,7 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     var muiGioLech by mutableStateOf("")
     /** Bộ nhớ tivi (byte trống, tổng byte), đọc lúc kết nối; null khi không đọc được. */
     var boNho by mutableStateOf<Pair<Long, Long>?>(null)
+    var tiLeHieuUng by mutableStateOf<String?>(null)
     /** Lỗi đang hiện là do tivi hết bộ nhớ: thanh lỗi có nút "Dọn bộ nhớ đệm". */
     var canDonBoNho by mutableStateOf(false)
     val muiGioDienThoai: String get() = java.util.TimeZone.getDefault().id
@@ -790,6 +791,7 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         khongPhaiTivi = !io { tv.laTivi() }
         muiGioLech = io { tv.muiGioTv() }.takeIf { lechMuiGio(it) } ?: ""
         boNho = io { tv.boNhoTrong() }
+        tiLeHieuUng = io { tv.docTiLeHieuUng() }
         xacNhanLaTivi = false
         val tt = io { tv.docTrangThai() }
         trangThai = tt
@@ -1243,6 +1245,25 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         val duoc = if (truoc != null && trong != null && trong > truoc) t(" (lấy lại ${ThaoTacTv.mb(trong - truoc)})", " (freed ${ThaoTacTv.mb(trong - truoc)})") else ""
         thongBao = t("Đã dọn bộ nhớ đệm$duoc. Đang cài Home sạch…", "Caches cleared$duoc. Installing the clean Home…")
         if (daCoHomeSach) apDungThemeBen() else caiHomeSachBen()
+    }
+
+    fun datTiLeHieuUng(scale: String) = chay(t("Đang chỉnh tốc độ hiệu ứng TV (${scale}x)…", "Setting TV animation scale (${scale}x)…")) {
+        if (io { tv.datTiLeHieuUng(scale) }) {
+            tiLeHieuUng = io { tv.docTiLeHieuUng() } ?: scale
+            com.txa.cleantxa.TxaLogger.i("TvSpeed", "Set TV animation scale to ${scale}x")
+            thongBao = t("Đã đặt tốc độ hiệu ứng TV: ${scale}x.", "TV animation scale set to ${scale}x.")
+        } else {
+            error(t("Không thể thay đổi tốc độ hiệu ứng trên TV này.", "Could not change animation scale on this TV."))
+        }
+    }
+
+    fun giaiPhongRamNen() = chay(t("Đang giải phóng RAM nền trên TV…", "Trimming background RAM on TV…")) {
+        if (io { tv.giaiPhongRamNen() }) {
+            com.txa.cleantxa.TxaLogger.i("TvSpeed", "Executed am kill-all on TV")
+            thongBao = t("Đã dọn các tiến trình nền để giải phóng RAM.", "Background processes trimmed to free RAM.")
+        } else {
+            error(t("Không thể giải phóng RAM nền trên TV này.", "Could not trim background RAM on this TV."))
+        }
     }
 
     private suspend fun caiHomeSachBen() {
