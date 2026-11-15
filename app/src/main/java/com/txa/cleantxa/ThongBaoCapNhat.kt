@@ -21,20 +21,20 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Báo "có bản mới" bằng thông báo Android cả khi app đang đóng.
- * WorkManager kiểm tra cap-nhat.json ~12 giờ một lần, mỗi bản chỉ báo một lần.
+ * WorkManager kiểm tra GitHub Releases mỗi 1 giờ một lần, mỗi bản chỉ báo một lần.
  */
 object ThongBaoCapNhat {
     private const val KENH = "cap-nhat"
     const val MO_CAP_NHAT = "mo_cap_nhat"
 
     fun hen(ctx: Context) {
-        val viec = PeriodicWorkRequestBuilder<KiemTraBanMoi>(12, TimeUnit.HOURS)
+        val viec = PeriodicWorkRequestBuilder<KiemTraBanMoi>(1, TimeUnit.HOURS)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-            .setInitialDelay(1, TimeUnit.HOURS)
+            .setInitialDelay(15, TimeUnit.MINUTES)
             .build()
         WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(
             "kiem-tra-ban-moi",
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             viec,
         )
     }
