@@ -1,6 +1,18 @@
 package com.txa.cleantxa.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -13,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -28,12 +41,23 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.txa.cleantxa.ManHinh
 import com.txa.cleantxa.t
@@ -48,6 +72,21 @@ fun ConnectScreen(vm: PhienLamViec) {
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        TvConnectHero(
+            scanning = vm.dangQuet,
+            connecting = vm.dangBan,
+            foundCount = vm.timThay.size,
+            statusMessage = when {
+                vm.dangQuet -> t("Đang quét tìm TV trên mạng Wi-Fi…", "Scanning Wi-Fi for TVs…")
+                vm.dangBan -> vm.thongBao.ifBlank { t("Đang kết nối tới TV…", "Connecting to TV…") }
+                vm.timThay.isNotEmpty() -> t(
+                    "Tìm thấy ${vm.timThay.size} thiết bị — chạm IP bên dưới để kết nối",
+                    "Found ${vm.timThay.size} device(s) — tap an IP below to connect"
+                )
+                else -> t("Sẵn sàng kết nối TV qua Wi-Fi", "Ready to connect TV over Wi-Fi")
+            },
+        )
+
         if (ManHinh.laTv) {
             TxaCard(
                 title = t("Kết nối ngay trên tivi này", "Connect on this TV"),
@@ -85,21 +124,26 @@ fun ConnectScreen(vm: PhienLamViec) {
                     Text(t("Quét mạng LAN", "Scan local network"))
                 }
             }
-            if (vm.timThay.isNotEmpty()) {
-                Spacer(Modifier.height(10.dp))
-                Text(t("Tìm thấy:", "Found:"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(6.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    vm.timThay.forEach { addr ->
-                        AssistChip(
-                            onClick = {
-                                val parts = addr.split(':')
-                                vm.ip = parts[0]
-                                vm.cong = parts.getOrElse(1) { "5555" }
-                                vm.ketNoi()
-                            },
-                            label = { Text(addr) },
-                        )
+            AnimatedVisibility(
+                visible = vm.timThay.isNotEmpty(),
+                enter = fadeIn() + expandVertically(),
+            ) {
+                Column {
+                    Spacer(Modifier.height(10.dp))
+                    Text(t("Tìm thấy:", "Found:"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(6.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        vm.timThay.forEach { addr ->
+                            AssistChip(
+                                onClick = {
+                                    val parts = addr.split(':')
+                                    vm.ip = parts[0]
+                                    vm.cong = parts.getOrElse(1) { "5555" }
+                                    vm.ketNoi()
+                                },
+                                label = { Text(addr) },
+                            )
+                        }
                     }
                 }
             }
@@ -183,6 +227,160 @@ fun ConnectScreen(vm: PhienLamViec) {
             Icon(Icons.AutoMirrored.Filled.HelpOutline, null, Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
             Text(t("Chưa bật được Gỡ lỗi? Xem hướng dẫn 7 bước", "Need help? Open 7-step guide"))
+        }
+    }
+}
+
+@Composable
+private fun TvConnectHero(
+    scanning: Boolean,
+    connecting: Boolean,
+    foundCount: Int,
+    statusMessage: String,
+) {
+    val active = scanning || connecting
+    val accent = MaterialTheme.colorScheme.primary
+    val secondary = MaterialTheme.colorScheme.secondary
+    val surface = MaterialTheme.colorScheme.surfaceVariant
+
+    val infinite = rememberInfiniteTransition(label = "tv_connect_hero")
+    val pulse by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = if (active) 1300 else 2600, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "pulse",
+    )
+    val glow by infinite.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = if (active) 700 else 1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "glow",
+    )
+
+    Surface(
+        color = surface.copy(alpha = 0.55f),
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(126.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+
+                    // Expanding radar / Wi-Fi rings behind TV
+                    val ringCount = if (active) 3 else 2
+                    for (i in 0 until ringCount) {
+                        val phase = (pulse + i / ringCount.toFloat()) % 1f
+                        val radius = 34.dp.toPx() + phase * 48.dp.toPx()
+                        val alpha = (1f - phase) * (if (active) 0.42f else 0.18f)
+                        drawCircle(
+                            color = accent.copy(alpha = alpha),
+                            radius = radius,
+                            center = Offset(cx, cy - 4.dp.toPx()),
+                            style = Stroke(width = 2.dp.toPx()),
+                        )
+                    }
+
+                    // TV frame
+                    val tvW = 132.dp.toPx()
+                    val tvH = 80.dp.toPx()
+                    val tvLeft = cx - tvW / 2f
+                    val tvTop = cy - tvH / 2f - 6.dp.toPx()
+
+                    drawRoundRect(
+                        color = Color(0xFF15222E),
+                        topLeft = Offset(tvLeft, tvTop),
+                        size = Size(tvW, tvH),
+                        cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx()),
+                    )
+                    drawRoundRect(
+                        color = accent.copy(alpha = if (active || foundCount > 0) 0.75f else 0.4f),
+                        topLeft = Offset(tvLeft, tvTop),
+                        size = Size(tvW, tvH),
+                        cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx()),
+                        style = Stroke(width = 2.dp.toPx()),
+                    )
+
+                    val pad = 6.dp.toPx()
+                    drawRoundRect(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                accent.copy(alpha = 0.24f * glow),
+                                secondary.copy(alpha = 0.18f * glow),
+                                Color(0xFF0A141D),
+                            ),
+                            start = Offset(tvLeft + pad, tvTop + pad),
+                            end = Offset(tvLeft + tvW - pad, tvTop + tvH - pad),
+                        ),
+                        topLeft = Offset(tvLeft + pad, tvTop + pad),
+                        size = Size(tvW - pad * 2, tvH - pad * 2),
+                        cornerRadius = CornerRadius(7.dp.toPx(), 7.dp.toPx()),
+                    )
+
+                    val arcCenter = Offset(cx, tvTop + tvH * 0.62f)
+                    for (j in 0..2) {
+                        val arcRadius = (12 + j * 11).dp.toPx()
+                        val arcAlpha = if (active) {
+                            val wave = ((pulse * 3f - j * 0.4f) % 1f + 1f) % 1f
+                            0.35f + 0.65f * (1f - wave)
+                        } else {
+                            0.55f - j * 0.12f
+                        }
+                        drawArc(
+                            color = accent.copy(alpha = arcAlpha),
+                            startAngle = -135f,
+                            sweepAngle = 90f,
+                            useCenter = false,
+                            topLeft = Offset(arcCenter.x - arcRadius, arcCenter.y - arcRadius),
+                            size = Size(arcRadius * 2, arcRadius * 2),
+                            style = Stroke(width = 2.6.dp.toPx(), cap = StrokeCap.Round),
+                        )
+                    }
+                    drawCircle(
+                        color = if (foundCount > 0) Color(0xFF4ADE80) else accent,
+                        radius = 3.5.dp.toPx() * (0.9f + 0.2f * glow),
+                        center = arcCenter,
+                    )
+
+                    val standTop = tvTop + tvH
+                    drawLine(
+                        color = Color(0xFF283A4A),
+                        start = Offset(cx, standTop),
+                        end = Offset(cx, standTop + 10.dp.toPx()),
+                        strokeWidth = 6.dp.toPx(),
+                    )
+                    drawLine(
+                        color = accent.copy(alpha = 0.55f),
+                        start = Offset(cx - 26.dp.toPx(), standTop + 11.dp.toPx()),
+                        end = Offset(cx + 26.dp.toPx(), standTop + 11.dp.toPx()),
+                        strokeWidth = 3.5.dp.toPx(),
+                        cap = StrokeCap.Round,
+                    )
+                }
+            }
+            Text(
+                text = statusMessage,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
