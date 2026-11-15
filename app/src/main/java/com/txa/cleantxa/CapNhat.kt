@@ -143,15 +143,56 @@ object CapNhat {
 
     /**
      * Tách changelog song ngữ từ GitHub Release body theo chuẩn `---`
-     * (trên là tiếng Việt, dưới `---` là tiếng Anh).
+     * (trên là tiếng Việt, dưới `---` là tiếng Anh), đồng thời làm sạch HTML/Markdown thô.
      */
     internal fun tachGhiChuSongNgu(body: String): Pair<String, String> {
         val raw = body.replace("\r\n", "\n").trim()
         if (raw.isEmpty()) return "" to ""
-        val parts = raw.split(Regex("(?m)^\\s*---\\s*$"), limit = 2)
-        val vi = parts[0].trim()
-        val en = parts.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() } ?: vi
+        val parts = raw.split(Regex("(?m)^\\s*(?:---|<hr\\s*/?>)\\s*$"), limit = 2)
+        val vi = lamSachGhiChu(parts[0], giuInlineMarkdown = false)
+        val en = parts.getOrNull(1)?.let { lamSachGhiChu(it, giuInlineMarkdown = false) }
+            ?.takeIf { it.isNotEmpty() } ?: vi
         return vi to en
+    }
+
+    /**
+     * Làm sạch các thẻ HTML (`<br>`, `<b>`, `<li>`, `&amp;`, …) và cú pháp Markdown block (`###`, `- `, `[a](url)`).
+     * Khi `giuInlineMarkdown = false`, bỏ luôn ký tự `**`, `*`, `` ` `` để hiện đẹp ở thông báo / text thường.
+     */
+    internal fun lamSachGhiChu(raw: String, giuInlineMarkdown: Boolean = false): String {
+        var s = raw.replace("\r\n", "\n")
+            .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
+            .replace(Regex("</?(?:p|div|h[1-6]|ul|ol)\\b[^>]*>", RegexOption.IGNORE_CASE), "\n")
+            .replace(Regex("<li\\b[^>]*>", RegexOption.IGNORE_CASE), "\n• ")
+            .replace(Regex("</li>", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("<(?:b|strong)\\b[^>]*>(.*?)</(?:b|strong)>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)), if (giuInlineMarkdown) "**$1**" else "$1")
+            .replace(Regex("<(?:i|em)\\b[^>]*>(.*?)</(?:i|em)>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)), if (giuInlineMarkdown) "*$1*" else "$1")
+            .replace(Regex("<code\\b[^>]*>(.*?)</code>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)), if (giuInlineMarkdown) "`$1`" else "$1")
+            .replace(Regex("<[^>]+>"), "")
+            .replace("&nbsp;", " ")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+
+        // Markdown links [label](url) -> label, headings ### Title -> Title, bullets -/* -> •
+        s = s.replace(Regex("\\[([^\\]]+)]\\([^)]+\\)"), "$1")
+            .replace(Regex("(?m)^\\s{0,3}#{1,6}\\s+"), "")
+            .replace(Regex("(?m)^\\s*[-*+]\\s+"), "• ")
+
+        if (!giuInlineMarkdown) {
+            s = s.replace(Regex("\\*\\*(.+?)\\*\\*"), "$1")
+                .replace(Regex("__(.+?)__"), "$1")
+                .replace(Regex("(?<!\\*)\\*([^*\\n]+)\\*(?!\\*)"), "$1")
+                .replace(Regex("`([^`\\n]+)`"), "$1")
+        }
+
+        return s.lines()
+            .map { it.trimEnd() }
+            .joinToString("\n")
+            .replace(Regex("\n{3,}"), "\n\n")
+            .trim()
     }
 
     internal fun soSanhPhienBan(a: String, b: String): Int {
