@@ -40,6 +40,7 @@ import java.net.InetSocketAddress
 import java.net.Socket
 
 enum class Man { CHINH, KET_NOI, THONG_TIN, CHON_GOI, DANG_TAT, HOME_SACH, XONG, KHOI_PHUC, HUONG_DAN, GIAY_PHEP, KHOA_TRE, REMOTE, LOGS, TV_LOI_QR }
+enum class BuocCaiDat { CHUA_BAT_DAU, DANG_TAI, SAN_SANG_CAI, CHO_PLAY_PROTECT, HOAN_TAT }
 
 /** Số app tối đa trong dock: bằng số cột lớn nhất của Home sạch (columns 1–8); dock dài hơn số cột thì tràn xuống hàng sau (22/10/2026, góp ý muốn hàng đầu nhiều app hơn). */
 const val DOCK_TOI_DA = 8
@@ -508,6 +509,7 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     var tienTrinhCapNhat by mutableStateOf<com.txa.cleantxa.CapNhat.TaiTienTrinh?>(null)
     var apkDaTai by mutableStateOf<java.io.File?>(null)
     var loiCapNhat by mutableStateOf("")
+    var buocCaiDat by mutableStateOf(BuocCaiDat.CHUA_BAT_DAU)
 
     init {
         com.txa.cleantxa.TxaLogger.init(ctx)
@@ -518,9 +520,18 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
             man = Man.TV_LOI_QR
         }
         viewModelScope.launch {
+            runCatching { io { com.txa.cleantxa.CapNhat.dongBoTuCleanYourTv(ctx) } }
+        }
+        viewModelScope.launch {
             val b = runCatching { io { com.txa.cleantxa.CapNhat.kiemTra(ctx) } }.getOrNull()
             banMoi = b
-            if (b != null) xuLyBanMoi(b)
+            if (b != null) {
+                com.txa.cleantxa.CapNhat.fileApkDaTai(ctx, b)?.let { cached ->
+                    apkDaTai = cached
+                    buocCaiDat = BuocCaiDat.SAN_SANG_CAI
+                }
+                xuLyBanMoi(b)
+            }
         }
         viewModelScope.launch {
             while (true) {
@@ -550,6 +561,7 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         hoiCapNhat = true
         dangCapNhat = true
         loiCapNhat = ""
+        buocCaiDat = BuocCaiDat.DANG_TAI
         tienTrinhCapNhat = com.txa.cleantxa.CapNhat.TaiTienTrinh(0L, b.apkSizeBytes, 0L)
         viewModelScope.launch {
             try {
@@ -566,6 +578,7 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
                                 ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                             )
                         }.isSuccess
+                        buocCaiDat = BuocCaiDat.CHUA_BAT_DAU
                         loiCapNhat = if (moDuoc) {
                             t("Cho phép CleanTxa cài ứng dụng, rồi quay lại bấm Thử lại / Cập nhật.", "Allow CleanTxa to install apps, then come back and press Update.")
                         } else {
@@ -574,14 +587,16 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
                         return@launch
                     }
                 }
-                val file = io {
+                val file = com.txa.cleantxa.CapNhat.fileApkDaTai(ctx, b) ?: io {
                     com.txa.cleantxa.CapNhat.taiApk(ctx, b) { prog ->
                         tienTrinhCapNhat = prog
                     }
                 }
                 apkDaTai = file
+                buocCaiDat = BuocCaiDat.CHO_PLAY_PROTECT
                 com.txa.cleantxa.CapNhat.moCaiApk(ctx, file)
             } catch (e: Throwable) {
+                buocCaiDat = BuocCaiDat.CHUA_BAT_DAU
                 loiCapNhat = t("Không tải được bản cập nhật: ${e.message}", "Update download failed: ${e.message}")
             } finally {
                 dangCapNhat = false
@@ -591,8 +606,12 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
 
     fun caiApkDaTai() {
         val f = apkDaTai ?: return
+        buocCaiDat = BuocCaiDat.CHO_PLAY_PROTECT
         runCatching { com.txa.cleantxa.CapNhat.moCaiApk(ctx, f) }
-            .onFailure { loiCapNhat = t("Không mở được trình cài đặt: ${it.message}", "Could not open installer: ${it.message}") }
+            .onFailure {
+                buocCaiDat = BuocCaiDat.SAN_SANG_CAI
+                loiCapNhat = t("Không mở được trình cài đặt: ${it.message}", "Could not open installer: ${it.message}")
+            }
     }
 
     fun taiLaiSaoLuu() { dsSaoLuu = kho.tatCa() }

@@ -294,8 +294,146 @@ object CapNhat {
         )
     }
 
+    /** Đường dẫn file APK của bản mới nếu đã tải sẵn trong cache. */
+    fun fileApkDaTai(ctx: Context, ban: BanMoi): File? {
+        val f = File(ctx.cacheDir, "cap-nhat/CleanTxa-${ban.versionName}.apk")
+        if (!f.isFile || f.length() <= 0L) return null
+        if (ban.apkSizeBytes > 0L && f.length() != ban.apkSizeBytes) return null
+        return f
+    }
+
+    /** Tải ngầm file APK bản mới vào cache nếu chưa có sẵn (dùng cho WorkManager chạy nền). */
+    fun taiApkNeuChuaCo(ctx: Context, ban: BanMoi): File? {
+        fileApkDaTai(ctx, ban)?.let { return it }
+        return runCatching { taiApk(ctx, ban) }
+            .onSuccess { TxaLogger.i("CapNhat", "Background pre-downloaded ${it.name} (${it.length()} bytes)") }
+            .onFailure { TxaLogger.w("CapNhat", "Background pre-download failed", it) }
+            .getOrNull()
+    }
+
+    /**
+     * Đồng bộ động danh sách mẫu tivi (`examples/`) và APK màn Home sạch mới nhất
+     * từ `Gathin23/cleanyourtv` (tối đa mỗi 6 giờ, chạy nền không chặn giao diện).
+     */
+    fun dongBoTuCleanYourTv(ctx: Context) {
+        val prefs = ctx.getSharedPreferences("ota", Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        val last = prefs.getLong("cleanyourtv_sync_at", 0L)
+        if (now - last < 6L * 3600_000L) return
+        prefs.edit().putLong("cleanyourtv_sync_at", now).apply()
+
+        // 1. Đồng bộ APK launcher từ release mới nhất của Gathin23/cleanyourtv (nếu có asset khớp)
+        runCatching {
+            val rel = JSONObject(
+                String(
+                    tai("https://api.github.com/repos/Gathin23/cleanyourtv/releases/latest", accept = "application/vnd.github+json"),
+                    Charsets.UTF_8,
+                )
+            )
+            val tag = rel.optString("tag_name")
+            if (tag.isNotBlank() && prefs.getString("cleanyourtv_rel", "") != tag) {
+                val assets = rel.optJSONArray("assets")
+                if (assets != null) {
+                    for (i in 0 until assets.length()) {
+                        val a = assets.optJSONObject(i) ?: continue
+                        val name = a.optString("name")
+                        val url = a.optString("browser_download_url")
+                        val targetName = when {
+                            name.equals("tvhome.apk", true) -> "tvhome.apk"
+                            name.equals("tvhome-xiaomi.apk", true) -> "tvhome-xiaomi.apk"
+                            else -> null
+                        } ?: continue
+                        if (url.startsWith("http")) {
+                            val bytes = tai(url, 60)
+                            if (bytes.size > 100_000) {
+                                val f = fileDuLieu(ctx, targetName).apply { parentFile?.mkdirs() }
+                                val tam = File(f.path + ".tam")
+                                tam.writeBytes(bytes)
+                                if (tam.renameTo(f)) {
+                                    TxaLogger.i("Sync", "Updated $targetName from Gathin23/cleanyourtv ($tag)")
+                                }
+                            }
+                        }
+                    }
+                }
+                prefs.edit().putString("cleanyourtv_rel", tag).apply()
+            }
+        }
+
+        // 2. Đồng bộ các mẫu tivi mới từ thư mục examples/ của Gathin23/cleanyourtv
+        runCatching {
+            val arr = org.json.JSONArray(
+                String(
+                    tai("https://api.github.com/repos/Gathin23/cleanyourtv/contents/examples", accept = "application/vnd.github+json"),
+                    Charsets.UTF_8,
+                )
+            )
+            val baseText = moAsset(ctx, "du-lieu.json").bufferedReader().readText()
+            val root = JSONObject(baseText)
+            val mauArr = root.getJSONArray("mau")
+            val existingIds = HashSet<String>()
+            for (i in 0 until mauArr.length()) {
+                existingIds.add(mauArr.getJSONObject(i).optString("id"))
+            }
+            var added = 0
+            for (i in 0 until arr.length()) {
+                val item = arr.optJSONObject(i) ?: continue
+                if (item.optString("type") != "dir") continue
+                val id = item.optString("name").trim()
+                if (id.isBlank() || id in existingIds) continue
+                val debloatRaw = runCatching {
+                    String(tai("https://raw.githubusercontent.com/Gathin23/cleanyourtv/main/examples/$id/debloat.txt", 15), Charsets.UTF_8)
+                }.getOrNull() ?: continue
+                val goiArr = org.json.JSONArray()
+                var currentGroup = ""
+                for (line in debloatRaw.lines()) {
+                    val trimmed = line.trim()
+                    if (trimmed.isEmpty()) continue
+                    if (trimmed.startsWith("#")) {
+                        currentGroup = trimmed.removePrefix("#").trim()
+                        continue
+                    }
+                    val pkg = trimmed.substringBefore('#').substringBefore(' ').trim()
+                    if (pkg.contains('.') && !pkg.contains('/')) {
+                        val note = trimmed.substringAfter('#', "").trim()
+                        goiArr.put(
+                            JSONObject()
+                                .put("pkg", pkg)
+                                .put("nhom", currentGroup)
+                                .put("ghiChu", note)
+                        )
+                    }
+                }
+                if (goiArr.length() == 0) continue
+                val configObj = runCatching {
+                    JSONObject(String(tai("https://raw.githubusercontent.com/Gathin23/cleanyourtv/main/examples/$id/config.json", 10), Charsets.UTF_8))
+                }.getOrNull()
+                val mauObj = JSONObject()
+                    .put("id", id)
+                    .put("ten", id.replace('-', ' ').replaceFirstChar { it.uppercase() })
+                    .put("header", "")
+                    .put("goi", goiArr)
+                if (configObj != null) mauObj.put("phim", configObj)
+                mauArr.put(mauObj)
+                existingIds.add(id)
+                added++
+                if (added >= 20) break
+            }
+            if (added > 0) {
+                val f = fileDuLieu(ctx, "du-lieu.json").apply { parentFile?.mkdirs() }
+                val tam = File(f.path + ".tam")
+                tam.writeText(root.toString(), Charsets.UTF_8)
+                if (tam.renameTo(f)) {
+                    com.txa.cleantxa.dulieu.DuLieu.lamMoiCache()
+                    TxaLogger.i("Sync", "Merged $added new TV model(s) from Gathin23/cleanyourtv")
+                }
+            }
+        }
+    }
+
     /** Tải APK bản mới vào cache rồi mở hộp cài của Android. */
     fun taiVaCai(ctx: Context, ban: BanMoi) {
-        moCaiApk(ctx, taiApk(ctx, ban))
+        val cached = fileApkDaTai(ctx, ban) ?: taiApk(ctx, ban)
+        moCaiApk(ctx, cached)
     }
 }

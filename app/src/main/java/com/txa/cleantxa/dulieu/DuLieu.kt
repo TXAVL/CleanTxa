@@ -29,7 +29,13 @@ class DuLieu(val mau: List<MauTv>, val thongKe: Map<String, ThongKeGoi>) {
         @Volatile private var cache: DuLieu? = null
 
         fun nap(context: Context): DuLieu = cache ?: synchronized(this) {
-            cache ?: docJson(context.assets.open("du-lieu.json").bufferedReader().readText()).also { cache = it }
+            cache ?: docJson(
+                com.txa.cleantxa.CapNhat.moAsset(context, "du-lieu.json").bufferedReader().readText()
+            ).also { cache = it }
+        }
+
+        fun lamMoiCache() {
+            synchronized(this) { cache = null }
         }
 
         fun docJson(text: String): DuLieu {

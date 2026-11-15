@@ -39,7 +39,7 @@ object ThongBaoCapNhat {
         )
     }
 
-    fun bao(ctx: Context, b: CapNhat.BanMoi) {
+    fun bao(ctx: Context, b: CapNhat.BanMoi, daTaiSan: Boolean = false) {
         val p = ctx.getSharedPreferences("ota", Context.MODE_PRIVATE)
         if (p.getInt("da_bao", 0) >= b.versionCode) return
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -59,13 +59,18 @@ object ThongBaoCapNhat {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+        val suffix = if (daTaiSan) {
+            t("Đã tải sẵn APK trong nền — chạm để cài đặt ngay.", "APK pre-downloaded in background — tap to install now.")
+        } else {
+            t("Chạm để cập nhật.", "Tap to update.")
+        }
         val tb = NotificationCompat.Builder(ctx, KENH)
             .setSmallIcon(R.drawable.ic_thong_bao)
             .setContentTitle(t("CleanTxa ${b.versionName} đã có", "CleanTxa ${b.versionName} is out"))
-            .setContentText(b.ghiChu.ifBlank { t("Chạm để cập nhật.", "Tap to update.") })
+            .setContentText(b.ghiChu.ifBlank { suffix })
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    (if (b.ghiChu.isNotBlank()) b.ghiChu + "\n" else "") + t("Chạm để cập nhật.", "Tap to update.")
+                    (if (b.ghiChu.isNotBlank()) b.ghiChu + "\n" else "") + suffix
                 )
             )
             .setColor(0xFF2EC4B6.toInt())
@@ -80,8 +85,10 @@ object ThongBaoCapNhat {
 class KiemTraBanMoi(ctx: Context, ts: WorkerParameters) : CoroutineWorker(ctx, ts) {
     override suspend fun doWork(): Result {
         NgonNgu.nap(applicationContext)
+        runCatching { CapNhat.dongBoTuCleanYourTv(applicationContext) }
         val b = runCatching { CapNhat.kiemTraApp() }.getOrElse { return Result.retry() } ?: return Result.success()
-        ThongBaoCapNhat.bao(applicationContext, b)
+        val preDownloaded = CapNhat.taiApkNeuChuaCo(applicationContext, b)
+        ThongBaoCapNhat.bao(applicationContext, b, daTaiSan = preDownloaded != null)
         return Result.success()
     }
 }

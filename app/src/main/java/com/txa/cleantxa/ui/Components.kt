@@ -147,6 +147,8 @@ fun CleanTxaApp(vm: PhienLamViec) {
         vm.banMoi?.let { b ->
             val downloadedFile = vm.apkDaTai
             val progress = vm.tienTrinhCapNhat
+            val step = vm.buocCaiDat
+            val estMinutes = if (b.apkSizeBytes > 0L) ((b.apkSizeBytes / (20L * 1048576L)).toInt() + 1).coerceIn(1, 5) else 1
             AlertDialog(
                 onDismissRequest = { if (!vm.dangCapNhat) vm.hoiCapNhat = false },
                 title = {
@@ -162,6 +164,22 @@ fun CleanTxaApp(vm: PhienLamViec) {
                 },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                t(
+                                    "Bạn đang dùng bản ${com.txa.cleantxa.BuildConfig.VERSION_NAME}. Cập nhật mất chừng $estMinutes phút, các tivi đã dọn và sao lưu vẫn giữ nguyên.",
+                                    "You're on ${com.txa.cleantxa.BuildConfig.VERSION_NAME}. Updating takes about $estMinutes min; all cleaned TVs and backups stay intact."
+                                ),
+                                modifier = Modifier.padding(10.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                        }
+
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                             shape = RoundedCornerShape(10.dp),
@@ -189,10 +207,53 @@ fun CleanTxaApp(vm: PhienLamViec) {
                             }
                         }
 
+                        // Tiến trình cài đặt 4 bước trong modal
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(
+                                Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text(
+                                    t("Tiến trình cập nhật", "Update progress"),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                UpdateStepRow(
+                                    idx = 1,
+                                    label = t("Tải tệp APK", "Download APK"),
+                                    done = step.ordinal >= BuocCaiDat.SAN_SANG_CAI.ordinal,
+                                    active = step == BuocCaiDat.DANG_TAI,
+                                )
+                                UpdateStepRow(
+                                    idx = 2,
+                                    label = t("Mở trình cài đặt Android", "Open Android installer"),
+                                    done = step.ordinal >= BuocCaiDat.CHO_PLAY_PROTECT.ordinal,
+                                    active = step == BuocCaiDat.SAN_SANG_CAI,
+                                )
+                                UpdateStepRow(
+                                    idx = 3,
+                                    label = t("Chấp nhận Play Protect / Bấm Cài đặt", "Accept Play Protect / Tap Install"),
+                                    done = step == BuocCaiDat.HOAN_TAT,
+                                    active = step == BuocCaiDat.CHO_PLAY_PROTECT,
+                                )
+                                UpdateStepRow(
+                                    idx = 4,
+                                    label = t("Cài đặt hoàn tất", "Installation complete"),
+                                    done = step == BuocCaiDat.HOAN_TAT,
+                                    active = false,
+                                )
+                            }
+                        }
+
                         Column(
                             Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 200.dp)
+                                .heightIn(max = 160.dp)
                                 .verticalScroll(rememberScrollState()),
                         ) {
                             Text(
@@ -274,10 +335,17 @@ fun CleanTxaApp(vm: PhienLamViec) {
                                                 fontWeight = FontWeight.Bold,
                                             )
                                             Text(
-                                                t(
-                                                    "Lưu tại: cache/cap-nhat/${downloadedFile.name} — sẵn sàng cài đặt.",
-                                                    "Saved to: cache/cap-nhat/${downloadedFile.name} — ready to install."
-                                                ),
+                                                if (step == BuocCaiDat.CHO_PLAY_PROTECT) {
+                                                    t(
+                                                        "Nếu Play Protect hỏi, bấm «Chi tiết khác» → «Vẫn cài đặt» để hoàn tất.",
+                                                        "If Play Protect asks, tap «More details» → «Install anyway» to finish."
+                                                    )
+                                                } else {
+                                                    t(
+                                                        "Lưu tại: cache/cap-nhat/${downloadedFile.name} — sẵn sàng cài đặt.",
+                                                        "Saved to: cache/cap-nhat/${downloadedFile.name} — ready to install."
+                                                    )
+                                                },
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -304,7 +372,10 @@ fun CleanTxaApp(vm: PhienLamViec) {
                         }
                         downloadedFile != null -> {
                             Button(onClick = { vm.caiApkDaTai() }) {
-                                Text(t("Cài đặt ngay", "Install now"))
+                                Text(
+                                    if (step == BuocCaiDat.CHO_PLAY_PROTECT) t("Mở lại trình cài đặt", "Re-open installer")
+                                    else t("Cài đặt ngay", "Install now")
+                                )
                             }
                         }
                         else -> {
@@ -323,6 +394,32 @@ fun CleanTxaApp(vm: PhienLamViec) {
                 },
             )
         }
+    }
+}
+
+@Composable
+private fun UpdateStepRow(idx: Int, label: String, done: Boolean, active: Boolean) {
+    val color = when {
+        done -> MaterialTheme.colorScheme.primary
+        active -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            if (done) "✓" else if (active) "●" else "$idx.",
+            color = color,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Text(
+            label,
+            color = color,
+            fontWeight = if (active || done) FontWeight.SemiBold else FontWeight.Normal,
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 
