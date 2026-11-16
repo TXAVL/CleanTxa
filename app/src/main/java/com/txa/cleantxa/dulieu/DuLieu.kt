@@ -190,6 +190,7 @@ val TEN_APP = mapOf(
     "com.google.android.tvlauncher" to "Màn hình Home gốc (Android TV)",
     "com.google.android.apps.tv.launcherx" to "Màn hình Home gốc (Google TV)",
     "com.gathin.tvhome" to "Home sạch (CleanYourTV)",
+    "com.txa.home" to "CleanTxa Home",
     "com.ts.launcher" to "Home sạch (bản cho Xiaomi)",
     "com.android.tv.settings" to "Cài đặt tivi",
     "org.videolan.vlc" to "VLC",
@@ -205,6 +206,7 @@ private val TEN_APP_EN = mapOf(
     "com.google.android.tvlauncher" to "Stock Home (Android TV)",
     "com.google.android.apps.tv.launcherx" to "Stock Home (Google TV)",
     "com.gathin.tvhome" to "Clean Home (CleanYourTV)",
+    "com.txa.home" to "CleanTxa Home",
     "com.ts.launcher" to "Clean Home (Xiaomi build)",
     "com.android.tv.settings" to "TV Settings",
 )

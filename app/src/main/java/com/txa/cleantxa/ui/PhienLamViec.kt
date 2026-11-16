@@ -91,8 +91,27 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     private val ctx: Context get() = getApplication()
     private val adb by lazy { KetNoiAdb.lay(ctx) }
     val kho by lazy { KhoSaoLuu(ctx) }
-    private val tv by lazy { ThaoTacTv(adb, kho) }
+    private val tv by lazy { ThaoTacTv(adb, kho).also { it.chonTxaHome = prefs.getBoolean("home_txa", false) } }
     private val prefs by lazy { ctx.getSharedPreferences("cleantxa", Context.MODE_PRIVATE) }
+
+    /** true: cài CleanTxa Home (launcher riêng của app); false: Home sạch của CleanYourTV. Lưu giữa các lần mở app. */
+    var homeTxa by mutableStateOf(prefs.getBoolean("home_txa", false))
+        private set
+    fun chonHomeTxa(bat: Boolean) {
+        homeTxa = bat
+        prefs.edit().putBoolean("home_txa", bat).apply()
+        tv.chonTxaHome = bat
+    }
+
+    // Công tắc riêng của CleanTxa Home (chỉ ghi vào cấu hình khi homeTxa bật).
+    var txaNhanh by mutableStateOf(prefs.getBoolean("txa_nhanh", true))
+    var txaGanDay by mutableStateOf(prefs.getBoolean("txa_gan_day", true))
+    var txaNguon by mutableStateOf(prefs.getBoolean("txa_nguon", true))
+    var txaNutTreEm by mutableStateOf(prefs.getBoolean("txa_nut_tre", true))
+    fun luuTuyChonTxa() {
+        prefs.edit().putBoolean("txa_nhanh", txaNhanh).putBoolean("txa_gan_day", txaGanDay)
+            .putBoolean("txa_nguon", txaNguon).putBoolean("txa_nut_tre", txaNutTreEm).apply()
+    }
 
     var man by mutableStateOf(Man.CHINH)
     /** Màn để quay về sau khi xem Hướng dẫn / Giấy phép. */
@@ -1479,6 +1498,16 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         // Một hàng + thư viện app: viên Thư viện chen vào hàng app, đã có nút trên thanh trên cùng (góp ý Giun2911 25/10/2026).
         if (motHang && thuVienApp) put("show_library_pill", false)
         put("show_greeting", !anLoiChao)
+        // CleanTxa Home đọc vài khoá theo tên riêng (khác Home sạch của CleanYourTV): ghi thêm để các công tắc có tác dụng.
+        if (homeTxa) {
+            put("show_quick_actions", txaNhanh)
+            put("show_recent", txaGanDay)
+            put("show_inputs", txaNguon)
+            put("show_kids_button", txaNutTreEm)
+            put("show_now_playing", nutDangPhat)
+            put("show_input_button", nutInput)
+            if (soCot > 0) put("columns", soCot)
+        }
         put("uniform_tiles", oDeuNhau)
         if (moKhiBat) put("open_on_start_choice", true)
         if (moKhiBat && moKhiThuc) put("wake_open_app", true)

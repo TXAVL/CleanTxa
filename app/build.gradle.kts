@@ -15,8 +15,8 @@ android {
         applicationId = "com.txa.cleantxa"
         minSdk = 26
         targetSdk = 36
-        versionCode = 12
-        versionName = "1.2.9"
+        versionCode = 13
+        versionName = "1.3.0"
     }
 
     buildTypes {

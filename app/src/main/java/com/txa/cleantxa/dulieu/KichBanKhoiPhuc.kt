@@ -7,7 +7,7 @@ package com.txa.cleantxa.dulieu
  * bắt đầu bằng ": " — Windows coi là nhãn, sh coi là lệnh rỗng — nên cả hai đều bỏ qua.
  */
 object KichBanKhoiPhuc {
-    private val HOME_SACH = listOf("com.gathin.tvhome", "com.ts.launcher")
+    private val HOME_SACH = listOf("com.gathin.tvhome", "com.ts.launcher", "com.txa.home")
     private const val PKG_KHOA = "zone.vgs.cleantv.khoa"
     private val TEN_GOI = Regex("^[A-Za-z0-9_.]+$")
     private val THANH_PHAN = Regex("^[A-Za-z0-9_.]+/[A-Za-z0-9_.$]+$")
