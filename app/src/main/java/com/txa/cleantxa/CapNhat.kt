@@ -18,6 +18,9 @@ object CapNhat {
     const val REPO = "TXAVL/CleanTxa"
     const val RELEASE_API = "https://api.github.com/repos/$REPO/releases/latest"
 
+    /** Cứ bao nhiêu phút thì kiểm tra bản mới (nền và khi đang mở app). 15 là mức tối thiểu WorkManager cho phép. */
+    const val CHU_KY_KIEM_TRA_PHUT = 15L
+
     data class BanMoi(
         val versionCode: Int,
         val versionName: String,

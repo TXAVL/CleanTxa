@@ -559,6 +559,21 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
                 xuLyBanMoi(b)
             }
         }
+        // Đang mở app thì cũng kiểm tra định kỳ, không đợi lần mở sau. Mỗi bản chỉ hỏi một lần (xuLyBanMoi nhớ da_hoi).
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(com.txa.cleantxa.CapNhat.CHU_KY_KIEM_TRA_PHUT * 60_000L)
+                if (dangCapNhat || dangKiemTraCapNhat) continue
+                val b = runCatching { io { com.txa.cleantxa.CapNhat.kiemTra(ctx) } }.getOrNull() ?: continue
+                if (banMoi?.versionCode == b.versionCode) continue
+                banMoi = b
+                com.txa.cleantxa.CapNhat.fileApkDaTai(ctx, b)?.let { cached ->
+                    apkDaTai = cached
+                    buocCaiDat = BuocCaiDat.SAN_SANG_CAI
+                }
+                xuLyBanMoi(b)
+            }
+        }
         viewModelScope.launch {
             while (true) {
                 kotlinx.coroutines.delay(400)
