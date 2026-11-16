@@ -62,6 +62,31 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
     // ---------- Bộ nhớ ----------
     // Tivi dùng lâu đầy bộ nhớ thì đẩy Home sạch vào không được (góp ý TCL, 01/11/2026: hard reset mới cài được).
 
+    /** Dịch vụ quản lý gói của Android trên tivi đã chạy chưa (chưa thì pm / cmd package báo "Can't find service"). */
+    fun goiSanSang(): Boolean = runCatching { sh("pm path android").contains("package:") }.getOrDefault(false)
+
+    /**
+     * Đợi tối đa [giay] giây cho dịch vụ gói của tivi chạy (tivi đang khởi động / vừa tự khởi động lại), nối lại ADB nếu
+     * rớt trong lúc chờ. true = sẵn sàng. Gọi từ luồng nền (có Thread.sleep).
+     */
+    fun choGoiSanSang(giay: Int, bao: (String) -> Unit = {}): Boolean {
+        if (goiSanSang()) return true
+        bao(t("Tivi chưa sẵn sàng (đang khởi động?), đợi tối đa $giay giây…", "The TV isn't ready yet (still starting?), waiting up to $giay s…"))
+        val het = System.currentTimeMillis() + giay * 1000L
+        while (System.currentTimeMillis() < het) {
+            Thread.sleep(3_000)
+            if (!runCatching { sh("echo ok").contains("ok") }.getOrDefault(false)) runCatching { adb.ketNoiLai() }
+            if (goiSanSang()) return true
+        }
+        return false
+    }
+
+    /** Lời giải thích khi dịch vụ gói của tivi không chạy, thay cho dòng "cmd: Can't find service: package". */
+    fun baoGoiChuaChay(): String = t(
+        "Hệ thống trên tivi chưa sẵn sàng (dịch vụ quản lý ứng dụng của Android chưa chạy). Thường là do tivi đang khởi động hoặc vừa tự khởi động lại. Chờ 1–2 phút cho tới khi thấy màn hình chính của tivi, rồi kết nối lại và thử lại. Tivi ảo thì có thể cần khởi động lại máy ảo (Cold Boot). Tivi vẫn giữ nguyên như cũ.",
+        "The TV's system isn't ready (Android's app-management service isn't running). This usually means the TV is starting up or has just restarted itself. Wait 1–2 minutes until you see the TV's home screen, then reconnect and try again. On an emulator you may need to restart it (Cold Boot). The TV is left as it was.",
+    )
+
     /** Chỗ trống của /data (byte trống, tổng byte); null khi không đọc được df. */
     fun boNhoTrong(): Pair<Long, Long>? = runCatching { docDf(sh("df -k /data")) }.getOrNull()
 
@@ -494,6 +519,9 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
         apkXiaomi: (() -> ByteArray)? = null,
         bao: (String) -> Unit,
     ): String? {
+        // Tivi đang khởi động hoặc vừa tự khởi động lại thì dịch vụ gói của Android chưa chạy ("cmd: Can't find service:
+        // package"): đợi nó lên thay vì cài thẳng rồi báo lỗi khó hiểu.
+        if (!choGoiSanSang(90, bao)) return baoGoiChuaChay()
         val home = homeHienTai().substringBefore('/')
         val homeGoc = when {
             home == pkgHome || home in HOME_SACH -> "none"
@@ -556,6 +584,7 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
         if (!out.contains("Success")) {
             return if (out.contains("UPDATE_INCOMPATIBLE"))
                 t("Tivi đã có Home sạch ký bằng khoá khác (cài từ máy khác). Gỡ bản cũ trước: pm uninstall $pkgHome.", "The TV has a clean Home signed with another key (installed from another computer). Uninstall it first: pm uninstall $pkgHome.")
+            else if (laLoiDichVuGoi(out)) baoGoiChuaChay()
             else t("Cài không được: ${out.trim().lines().lastOrNull()}. Home gốc vẫn nguyên.", "Install failed: ${out.trim().lines().lastOrNull()}. The stock Home is untouched.")
         }
         sl.launcherDaCai = true; luuSaoLuu(sl)
@@ -640,8 +669,8 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
             // Google TV còn setupwraith (2.6.2): Home gốc đã trả lại, vẫn ghi cấu hình rồi để thuPhimHome cho Home sạch mở đè
             // (damBaoPhimHome → chuyenDe); không được thì nó báo cách quên Wi-Fi.
             if (!(bayGio.startsWith("$SETUP/") || dangBat(SETUP)))
-                return t("Home sau khi đổi là '${bayGio.ifBlank { "không rõ" }}'. Đã trả Home gốc, tivi vẫn như cũ. Gửi góp ý kèm hãng, model để VGS thêm hỗ trợ.",
-                "Home resolved to '${bayGio.ifBlank { "unknown" }}'. The stock Home is back, the TV is as before. Send feedback with the brand and model so VGS can add support.")
+                return t("Home sau khi đổi là '${bayGio.ifBlank { "không rõ" }}'. Đã trả Home gốc, tivi vẫn như cũ. Gửi góp ý kèm hãng, model cho nhà phát triển để thêm hỗ trợ.",
+                "Home resolved to '${bayGio.ifBlank { "unknown" }}'. The stock Home is back, the TV is as before. Send feedback with the brand and model so the developer can add support.")
         }
 
         // Xiaomi: bản com.gathin.tvhome cài từ trước (bị hãng chặn) thì gỡ, để không còn hai Home sạch.
@@ -882,8 +911,8 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
         ghiFileTheme("config.json", ghi.toByteArray())
         if (anhNen != null) {
             if (!ghiFileTheme("wallpaper.jpg", anhNen)) throw java.io.IOException(
-                t("Ảnh nền chưa sang được tivi (tivi chặn ghi file của Home sạch). Bấm Áp dụng lên tivi lại; vẫn không được thì bấm \"Gửi danh sách cho VGS\" để gửi kèm lỗi cho VGS xem.",
-                    "The wallpaper did not reach the TV (it blocks writing the clean Home's files). Apply again; if it still fails, press \"Send the list to VGS\" so VGS gets the error."))
+                t("Ảnh nền chưa sang được tivi (tivi chặn ghi file của Home sạch). Bấm Áp dụng lên tivi lại; vẫn không được thì mở Nhật ký (Logs) và gửi cho nhà phát triển xem lỗi.",
+                    "The wallpaper did not reach the TV (it blocks writing the clean Home's files). Apply again; if it still fails, open the Logs and send them to the developer so they can see the error."))
         } else sh("rm -f $dir/wallpaper.jpg 2>/dev/null; content delete --uri $uri/wallpaper.jpg 2>/dev/null; true")
         // Bộ ảnh xoay vòng (wallpapers/): xoá bộ cũ trước, theme không có bộ ảnh thì chỉ xoá.
         sh("rm -rf $dir/wallpapers 2>/dev/null; content delete --uri $uri/wallpapers 2>/dev/null; true")
@@ -1453,7 +1482,7 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
             bao(t("Cài app Khoá trẻ em lên tivi…", "Installing the Kids lock app on the TV…"))
             adb.ghiFile("/data/local/tmp/khoa.apk", apk)
             val out = sh("pm install -r /data/local/tmp/khoa.apk; rm -f /data/local/tmp/khoa.apk")
-            if (!out.contains("Success")) error(t("Cài không được: ${out.trim().lines().lastOrNull()}", "Install failed: ${out.trim().lines().lastOrNull()}"))
+            if (!out.contains("Success")) error(if (laLoiDichVuGoi(out)) baoGoiChuaChay() else t("Cài không được: ${out.trim().lines().lastOrNull()}", "Install failed: ${out.trim().lines().lastOrNull()}"))
         }
         sh("pm grant $PKG_KHOA android.permission.WRITE_SECURE_SETTINGS 2>/dev/null; cmd appops set $PKG_KHOA AUTO_START allow 2>/dev/null; true")
         bao(t("Ghi giờ khoá và mã PIN…", "Saving the schedule and PIN…"))
@@ -1662,6 +1691,9 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
 
         /** Dịch vụ hệ thống không trả lời: tivi đang tắt máy / khởi động lại. */
         private val DICH_VU_CHET = Regex("Failure calling service|Can't find service|DeadObjectException|DeadSystemException")
+
+        /** Kết quả lệnh cho thấy dịch vụ gói / hệ thống của tivi không chạy (không phải lỗi của gói đang cài). */
+        fun laLoiDichVuGoi(s: String) = DICH_VU_CHET.containsMatchIn(s) || s.contains("Could not access the Package Manager")
 
         val TEN_GOI = Regex("""^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$""")
         /** Tên máy / tên gói gợi ý máy chiếu (21/10/2026, Formovie Nemo). */
