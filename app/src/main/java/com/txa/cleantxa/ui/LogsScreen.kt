@@ -162,12 +162,10 @@ fun LogsScreen(vm: PhienLamViec) {
                     Spacer(Modifier.width(6.dp))
                     Text(t("Chia sẻ", "Share"))
                 }
-                if (com.txa.cleantxa.ManHinh.laTv) {
-                    OutlinedButton(onClick = { vm.moManLoiQr() }) {
-                        Icon(Icons.Default.QrCode2, null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(t("Web QR (2311)", "Web QR (2311)"))
-                    }
+                OutlinedButton(onClick = { vm.moManLoiQr() }) {
+                    Icon(Icons.Default.QrCode2, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(t("Web QR (2311)", "Web QR (2311)"))
                 }
                 OutlinedButton(onClick = { TxaLogger.clear(ctx) }) {
                     Icon(Icons.Default.DeleteSweep, null, Modifier.size(16.dp))
