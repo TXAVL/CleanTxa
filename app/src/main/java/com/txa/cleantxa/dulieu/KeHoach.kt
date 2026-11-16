@@ -71,7 +71,7 @@ object KeHoach {
     fun laGoiLoi(pkg: String) = GIU_LOI.containsMatchIn(pkg)
 
     /** Tên gói Home sạch (bản thường + bản Xiaomi nội địa). */
-    private val HOME_SACH_GOI = setOf("com.gathin.tvhome", "com.ts.launcher")
+    private val HOME_SACH_GOI = setOf("com.gathin.tvhome", "com.ts.launcher", "com.txa.home")
 
     /**
      * Khối gói lõi của repo CleanYourTV (tools/disable.sh CORE_RE / CORE_OK, tests/test_core_packages.py, #884), chép

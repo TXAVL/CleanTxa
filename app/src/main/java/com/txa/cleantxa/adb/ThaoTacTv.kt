@@ -19,18 +19,34 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
      * tivi đã có app khác mang tên đó. 22/10/2026, MiTV-ASTP0: bản com.gathin.tvhome cài được nhưng nút Home ra màn đen.
      */
     private var pkgHomeDaDo: String? = null
+
+    /**
+     * Người dùng chọn CleanTxa Home (launcher riêng của app, gói [PKG_HOME_TXA]) thay vì Home sạch của CleanYourTV.
+     * Tivi Xiaomi bản Trung Quốc chỉ nhận Home có tên trong danh sách của hãng nên ở đó vẫn dùng [PKG_HOME_XIAOMI].
+     */
+    var chonTxaHome: Boolean = false
+        set(v) { if (field != v) { field = v; pkgHomeDaDo = null } }
+
     val pkgHome: String get() = pkgHomeDaDo ?: run {
         val cuaMinh = sh("dumpsys package $PKG_HOME_XIAOMI | grep -c '$PKG_HOME_XIAOMI/$NS_HOME.MainActivity'").trim().toIntOrNull()?.let { it > 0 } == true
         val coTen = sh("pm path $PKG_HOME_XIAOMI").isNotBlank()
         val xiaomi = sh("pm list packages com.mitv.tvhome").lines().any { it.trim() == "package:com.mitv.tvhome" }
-        if (cuaMinh || (xiaomi && !coTen)) PKG_HOME_XIAOMI else PKG_HOME
+        when {
+            cuaMinh || (xiaomi && !coTen) -> PKG_HOME_XIAOMI
+            chonTxaHome && !xiaomi -> PKG_HOME_TXA
+            else -> PKG_HOME
+        }
     }.also { pkgHomeDaDo = it }
 
     /** Gọi khi kết nối tivi mới: quên những gì đã dò của tivi trước. */
     fun quenTivi() { pkgHomeDaDo = null; cvteDaDo = null }
     val cmpHome get() = "$pkgHome/$NS_HOME.MainActivity"
     /** File APK trong assets cho pkgHome. */
-    val apkHome get() = if (pkgHome == PKG_HOME_XIAOMI) "tvhome-xiaomi.apk" else "tvhome.apk"
+    val apkHome get() = when (pkgHome) {
+        PKG_HOME_XIAOMI -> "tvhome-xiaomi.apk"
+        PKG_HOME_TXA -> "txahome.apk"
+        else -> "tvhome.apk"
+    }
 
     /**
      * Cho Home sạch đọc lại cấu hình: dựng lại màn Home (NEW_TASK | CLEAR_TASK) và báo hai dịch vụ bắt phím đọc lại file
@@ -633,6 +649,15 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
             bao(t("Gỡ Home sạch bản cũ ($PKG_HOME)…", "Removing the old clean Home ($PKG_HOME)…"))
             sh("pm uninstall $PKG_HOME")
         }
+        // Đổi qua lại giữa CleanTxa Home và Home sạch của CleanYourTV: gỡ bản kia để không còn hai Home sạch.
+        if (pkgHome == PKG_HOME_TXA && sh("pm path $PKG_HOME").isNotBlank()) {
+            bao(t("Gỡ Home sạch của CleanYourTV ($PKG_HOME)…", "Removing the CleanYourTV clean Home ($PKG_HOME)…"))
+            sh("pm uninstall $PKG_HOME")
+        }
+        if (pkgHome != PKG_HOME_TXA && sh("pm path $PKG_HOME_TXA").isNotBlank()) {
+            bao(t("Gỡ CleanTxa Home ($PKG_HOME_TXA)…", "Removing CleanTxa Home ($PKG_HOME_TXA)…"))
+            sh("pm uninstall $PKG_HOME_TXA")
+        }
         bao(t("Ghi cấu hình dock…", "Writing the dock settings…"))
         dayCauHinh(cauHinh, anhNen, boAnh)
         if (cvte && (nutInput || nutHome)) {
@@ -820,9 +845,10 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
         // RESTORE_KEY_SERVICES=1). Tắt thì thu lại quyền cho gọn.
         val moi = runCatching { org.json.JSONObject(json) }.getOrNull()
         // Khoá chuyển đè Home cũ do damBaoPhimHome gắn (tivi không cho tắt Home gốc): đổi giao diện không được làm mất nó.
-        val ghi = moi?.takeIf { !it.has("stock_home_redirect") }?.let { m ->
+        val ghi0 = moi?.takeIf { !it.has("stock_home_redirect") }?.let { m ->
             docCauHinhTv()?.optString("stock_home_redirect")?.takeIf { it.isNotBlank() }?.let { m.put("stock_home_redirect", it).toString() }
         } ?: json
+        val ghi = if (pkgHome == PKG_HOME_TXA) giuTrangThaiTxa(ghi0) else ghi0
         val cuoi = runCatching { org.json.JSONObject(ghi) }.getOrNull()
         val khoiPhucPhim = cuoi?.optBoolean("restore_key_services") ?: false
         // BootHome của bản vá (3.4.2, TCL 43P618 về Home gốc sau khi rút điện): lúc khởi động, Home sạch tự bật lại dịch vụ
@@ -865,6 +891,19 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
         anhKenh.forEach { (ten, du) -> ghiFileTheme("kenh-$ten", du) }
         ghiFileTheme("theme_revision", java.util.UUID.randomUUID().toString().replace("-", "").toByteArray())
         sh(KHOI_DONG_LAI_HOME)
+    }
+
+    /**
+     * CleanTxa Home lưu trên tivi những thứ người dùng làm ngay trên Home (chế độ và danh sách trẻ em, mã PIN, app bị ẩn).
+     * Đẩy cấu hình từ điện thoại ghi đè cả file nên giữ lại các khoá này nếu cấu hình mới không có.
+     */
+    private fun giuTrangThaiTxa(json: String): String {
+        val moi = runCatching { org.json.JSONObject(json) }.getOrNull() ?: return json
+        val cu = docCauHinhTv() ?: return json
+        for (k in listOf("kids_mode", "kids_apps", "kids_pin", "hidden_apps")) {
+            if (!moi.has(k) && cu.has(k)) moi.put(k, cu.get(k))
+        }
+        return moi.toString()
     }
 
     /**
@@ -1629,6 +1668,8 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
         val TU_MAY_CHIEU = Regex("projector|formovie|fengmi|xgimi|jmgo|dangbei|nebula|wanbo|byintek|keystone|autofocus|tixing|duijiao", RegexOption.IGNORE_CASE)
         const val PKG_HOME = "com.gathin.tvhome"
         const val PKG_HOME_XIAOMI = "com.ts.launcher"
+        /** CleanTxa Home: launcher riêng của app (module :launcher dựng với applicationId này), đi kèm app là txahome.apk. */
+        const val PKG_HOME_TXA = "com.txa.home"
         /** App Khoá trẻ em (module khoa/). */
         const val PKG_KHOA = "zone.vgs.cleantv.khoa"
         /** versionCode của khoa.apk đi kèm (2 = khoá từng app); tivi có bản thấp hơn thì cài đè. */
@@ -1657,7 +1698,7 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
             |""".trimMargin()
         /** Namespace Java của launcher: không đổi theo tên gói. */
         const val NS_HOME = "com.gathin.tvhome"
-        val HOME_SACH = setOf(PKG_HOME, PKG_HOME_XIAOMI)
+        val HOME_SACH = setOf(PKG_HOME, PKG_HOME_XIAOMI, PKG_HOME_TXA)
         const val SETUP = "com.google.android.tungsten.setupwraith"
         const val HOME_QUERY = "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"
         val HOME_GOC_BIET = listOf(

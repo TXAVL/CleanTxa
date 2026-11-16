@@ -15,7 +15,7 @@ object AppNgoai {
     fun loc(tuCai: Set<String>, loiDienThoai: Set<String>, loiTivi: Set<String>, nhanHome: Set<String>): Set<String> =
         tuCai.filter { it in loiDienThoai && it !in loiTivi && it !in nhanHome && !laGoiCleanTv(it) }.toSortedSet()
 
-    private fun laGoiCleanTv(pkg: String) = pkg == "com.gathin.tvhome" || pkg == "com.txa.cleantxa" || pkg == "zone.vgs.cleantv.khoa"
+    private fun laGoiCleanTv(pkg: String) = pkg == "com.gathin.tvhome" || pkg == "com.txa.home" || pkg == "com.txa.cleantxa" || pkg == "zone.vgs.cleantv.khoa"
 
     /** Gộp [ngoai] vào library_apps của [json], bỏ gói trong hidden_apps. Không có gì mới thì trả nguyên [json]. */
     fun gop(json: String, ngoai: Set<String>): String {

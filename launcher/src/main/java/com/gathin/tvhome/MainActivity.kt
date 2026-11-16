@@ -1,7 +1,14 @@
 package com.gathin.tvhome
 
 import android.app.Activity
+import android.app.ActivityManager
 import android.app.AlertDialog
+import android.media.AudioManager
+import android.media.tv.TvContract
+import android.media.tv.TvInputManager
+import android.text.InputFilter
+import android.text.InputType
+import android.widget.EditText
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -62,6 +69,16 @@ class MainActivity : Activity() {
     private lateinit var channelsRow: LinearLayout
     private lateinit var channelsScroll: HorizontalScrollView
     private lateinit var appsGrid: GridLayout
+    private lateinit var wifiPill: TextView
+    private lateinit var settingsPill: TextView
+    private lateinit var kidsPill: TextView
+    private lateinit var appsLabel: TextView
+    private lateinit var quickSection: LinearLayout
+    private lateinit var quickRow: LinearLayout
+    private lateinit var inputsSection: LinearLayout
+    private lateinit var inputsRow: LinearLayout
+    private lateinit var recentSection: LinearLayout
+    private lateinit var recentRow: LinearLayout
 
     private val reloadReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -205,12 +222,18 @@ class MainActivity : Activity() {
             Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
         }
         pillsBar.addView(nowPlayingBtn)
-        pillsBar.addView(makePill("Wi-Fi") {
+        kidsPill = makePill(tr("Trẻ em", "Kids")) { onKidsPillClick() }.apply {
+            setOnLongClickListener { onKidsPillLongClick(); true }
+        }
+        pillsBar.addView(kidsPill)
+        wifiPill = makePill("Wi-Fi") {
             runCatching { startActivity(Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-        })
-        pillsBar.addView(makePill("Cài đặt") {
+        }
+        pillsBar.addView(wifiPill)
+        settingsPill = makePill(tr("Cài đặt", "Settings")) {
             runCatching { startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-        })
+        }
+        pillsBar.addView(settingsPill)
         topBar.addView(pillsBar, LinearLayout.LayoutParams(-2, -2))
         content.addView(topBar, LinearLayout.LayoutParams(-1, -2))
 
@@ -225,9 +248,17 @@ class MainActivity : Activity() {
         channelsScroll.addView(channelsRow)
         content.addView(channelsScroll, LinearLayout.LayoutParams(-1, -2))
 
+        // Quick actions, inputs and recent apps rows
+        buildSection(tr("Tiện ích nhanh", "Quick actions")).let { (s, r) -> quickSection = s; quickRow = r }
+        buildSection(tr("Nguồn vào", "Inputs")).let { (s, r) -> inputsSection = s; inputsRow = r }
+        buildSection(tr("Mở gần đây", "Recent")).let { (s, r) -> recentSection = s; recentRow = r }
+        content.addView(quickSection, LinearLayout.LayoutParams(-1, -2))
+        content.addView(inputsSection, LinearLayout.LayoutParams(-1, -2))
+        content.addView(recentSection, LinearLayout.LayoutParams(-1, -2))
+
         // Apps section header
-        val appsLabel = TextView(this).apply {
-            text = "Ứng dụng"
+        appsLabel = TextView(this).apply {
+            text = tr("Ứng dụng", "Apps")
             setTextColor(Color.parseColor("#9FB0C0"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setPadding(dp(4), dp(18), 0, dp(10))
@@ -286,8 +317,14 @@ class MainActivity : Activity() {
         updateClock()
         updateGreeting()
         updateWeather()
-        nowPlayingBtn.visibility = if (cfg.showNowPlaying) View.VISIBLE else View.GONE
-        if (cfg.showNetworkIp) {
+        val kids = cfg.kidsMode
+        nowPlayingBtn.visibility = if (cfg.showNowPlaying && !kids) View.VISIBLE else View.GONE
+        wifiPill.visibility = if (kids) View.GONE else View.VISIBLE
+        settingsPill.visibility = if (kids) View.GONE else View.VISIBLE
+        kidsPill.visibility = if (cfg.showKidsButton || kids) View.VISIBLE else View.GONE
+        kidsPill.text = if (kids) tr("Thoát chế độ trẻ em", "Exit kids mode") else tr("Trẻ em", "Kids")
+        appsLabel.text = if (kids) tr("Ứng dụng cho bé", "Apps for kids") else tr("Ứng dụng", "Apps")
+        if (cfg.showNetworkIp && !kids) {
             ipPill.text = localIpv4() ?: "Offline"
             ipPill.visibility = View.VISIBLE
         } else {
@@ -297,6 +334,9 @@ class MainActivity : Activity() {
         handler.removeCallbacks(clockTicker)
         handler.post(clockTicker)
         rebuildChannels()
+        rebuildQuick()
+        rebuildInputs()
+        rebuildRecent()
         rebuildApps()
 
         handler.removeCallbacks(wallpaperRotator)
@@ -392,7 +432,7 @@ class MainActivity : Activity() {
 
     private fun rebuildChannels() {
         channelsRow.removeAllViews()
-        if (cfg.linkTiles.isEmpty()) {
+        if (cfg.linkTiles.isEmpty() || cfg.kidsMode) {
             channelsScroll.visibility = View.GONE
             return
         }
@@ -448,30 +488,9 @@ class MainActivity : Activity() {
         appsGrid.removeAllViews()
         appsGrid.columnCount = cfg.columns
 
-        val pm = packageManager
-        val leanbackIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
-        val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-
-        val resolved = LinkedHashMap<String, AppEntry>()
-        fun collect(list: List<ResolveInfo>) {
-            for (ri in list) {
-                val pkg = ri.activityInfo?.packageName ?: continue
-                if (pkg == packageName || pkg in cfg.hiddenApps) continue
-                if (pkg !in resolved) {
-                    val label = ri.loadLabel(pm).toString()
-                    val icon = ri.loadIcon(pm)
-                    resolved[pkg] = AppEntry(pkg, label, icon)
-                }
-            }
+        val ordered = orderedApps().let { list ->
+            if (cfg.kidsMode) list.filter { it.pkg in cfg.kidsApps } else list
         }
-        collect(pm.queryIntentActivities(leanbackIntent, PackageManager.MATCH_ALL))
-        val mobileApps = pm.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL)
-            .filter { it.activityInfo?.packageName in cfg.libraryApps }
-        collect(mobileApps)
-
-        val ordered = mutableListOf<AppEntry>()
-        cfg.dockApps.forEach { pkg -> resolved.remove(pkg)?.let { ordered += it } }
-        ordered.addAll(resolved.values.sortedBy { it.label.lowercase(Locale.getDefault()) })
 
         val cardBg = if (cfg.dockGlass) Color.parseColor("#26FFFFFF") else Color.parseColor("#182430")
         val screenW = resources.displayMetrics.widthPixels - dp(80)
@@ -498,7 +517,7 @@ class MainActivity : Activity() {
                 layoutParams = lp
                 setOnClickListener { launchApp(app.pkg) }
                 setOnLongClickListener {
-                    showAppMenu(app)
+                    if (!cfg.kidsMode) showAppMenu(app)
                     true
                 }
                 setOnFocusChangeListener { v, hasFocus ->
@@ -535,34 +554,311 @@ class MainActivity : Activity() {
         val i = packageManager.getLeanbackLaunchIntentForPackage(pkg)
             ?: packageManager.getLaunchIntentForPackage(pkg)
         if (i != null) {
+            pushRecent(pkg)
             runCatching { startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         }
     }
 
-    private fun showAppMenu(app: AppEntry) {
-        AlertDialog.Builder(this)
-            .setTitle(app.label)
-            .setItems(arrayOf("Ẩn khỏi màn hình chính", "Thông tin ứng dụng")) { _, which ->
-                when (which) {
-                    0 -> {
-                        ConfigStore.updateRaw(this) { j ->
-                            val arr = j.optJSONArray("hidden_apps") ?: JSONArray()
-                            arr.put(app.pkg)
-                            j.put("hidden_apps", arr)
-                        }
-                        reloadAll()
-                    }
-                    1 -> {
-                        runCatching {
-                            startActivity(
-                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${app.pkg}"))
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            )
-                        }
-                    }
+    // ---------- Danh sách app ----------
+
+    /** Mọi app mở được trên tivi (không tính app bị ẩn và chính launcher), theo thứ tự tìm thấy. */
+    private fun collectApps(): LinkedHashMap<String, AppEntry> {
+        val pm = packageManager
+        val leanbackIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
+        val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val resolved = LinkedHashMap<String, AppEntry>()
+        fun collect(list: List<ResolveInfo>) {
+            for (ri in list) {
+                val pkg = ri.activityInfo?.packageName ?: continue
+                if (pkg == packageName || pkg in cfg.hiddenApps) continue
+                if (pkg !in resolved) {
+                    resolved[pkg] = AppEntry(pkg, ri.loadLabel(pm).toString(), ri.loadIcon(pm))
                 }
             }
+        }
+        collect(pm.queryIntentActivities(leanbackIntent, PackageManager.MATCH_ALL))
+        collect(
+            pm.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL)
+                .filter { it.activityInfo?.packageName in cfg.libraryApps }
+        )
+        return resolved
+    }
+
+    /** App theo thứ tự hiển thị: app trong dock_apps trước (đúng thứ tự), phần còn lại theo tên. */
+    private fun orderedApps(): MutableList<AppEntry> {
+        val resolved = collectApps()
+        val ordered = mutableListOf<AppEntry>()
+        cfg.dockApps.forEach { pkg -> resolved.remove(pkg)?.let { ordered += it } }
+        ordered.addAll(resolved.values.sortedBy { it.label.lowercase(Locale.getDefault()) })
+        return ordered
+    }
+
+    // ---------- Tiện ích nhanh ----------
+
+    private fun buildSection(title: String): Pair<LinearLayout, LinearLayout> {
+        val section = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+        }
+        section.addView(TextView(this).apply {
+            text = title
+            setTextColor(Color.parseColor("#9FB0C0"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setPadding(dp(4), dp(18), 0, dp(8))
+        })
+        val scroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        scroll.addView(row)
+        section.addView(scroll, LinearLayout.LayoutParams(-1, -2))
+        return section to row
+    }
+
+    /** Nút trong một hàng: giống makePill nhưng cách nhau bên phải. */
+    private fun makeChip(label: String, onClick: () -> Unit): TextView =
+        makePill(label, onClick).apply {
+            layoutParams = LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(10) }
+        }
+
+    private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+
+    private fun rebuildQuick() {
+        quickRow.removeAllViews()
+        val show = cfg.showQuickActions && !cfg.kidsMode
+        quickSection.visibility = if (show) View.VISIBLE else View.GONE
+        if (!show) return
+        val audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        quickRow.addView(makeChip(tr("Âm lượng −", "Volume −")) {
+            audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI)
+        })
+        quickRow.addView(makeChip(tr("Âm lượng +", "Volume +")) {
+            audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI)
+        })
+        quickRow.addView(makeChip(tr("Tắt tiếng", "Mute")) {
+            audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, AudioManager.FLAG_SHOW_UI)
+        })
+        quickRow.addView(makeChip(tr("Dọn RAM", "Free RAM")) { freeRam() })
+        quickRow.addView(makeChip(tr("Màn hình chờ", "Screensaver")) {
+            runCatching {
+                startActivity(
+                    Intent(Intent.ACTION_MAIN)
+                        .setClassName("com.android.systemui", "com.android.systemui.Somnambulator")
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }.onFailure { toast(tr("Tivi không mở được màn hình chờ", "This TV could not start the screensaver")) }
+        })
+    }
+
+    /** Dừng tiến trình nền của các app mở được trên tivi, rồi báo đã giải phóng bao nhiêu. */
+    private fun freeRam() {
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        fun avail(): Long = ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }.availMem
+        val before = avail()
+        val pkgs = collectApps().keys
+        scope.launch {
+            withContext(Dispatchers.IO) { pkgs.forEach { runCatching { am.killBackgroundProcesses(it) } } }
+            kotlinx.coroutines.delay(800)
+            val freed = ((avail() - before) / (1024 * 1024)).coerceAtLeast(0)
+            toast(tr("Đã dọn RAM: trống thêm khoảng $freed MB", "RAM freed: about $freed MB more available"))
+        }
+    }
+
+    // ---------- Nguồn vào ----------
+
+    private fun rebuildInputs() {
+        inputsRow.removeAllViews()
+        val show = cfg.showInputs && !cfg.kidsMode
+        var any = false
+        if (show) {
+            runCatching {
+                val tim = getSystemService(Context.TV_INPUT_SERVICE) as TvInputManager
+                tim.tvInputList.filter { it.isPassthroughInput }.forEach { info ->
+                    val label = (info.loadCustomLabel(this) ?: info.loadLabel(this)).toString()
+                    inputsRow.addView(makeChip(label) { switchInput(info.id) })
+                    any = true
+                }
+            }
+        }
+        inputsSection.visibility = if (show && any) View.VISIBLE else View.GONE
+    }
+
+    private fun switchInput(inputId: String) {
+        runCatching {
+            startActivity(
+                Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(inputId))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }.onFailure { toast(tr("Không chuyển được nguồn vào", "Could not switch input")) }
+    }
+
+    // ---------- Mở gần đây ----------
+
+    private val recentPrefs get() = getSharedPreferences("home", Context.MODE_PRIVATE)
+
+    private fun recentPkgs(): List<String> =
+        recentPrefs.getString("recent", "").orEmpty().split(',').filter { it.isNotBlank() }
+
+    private fun pushRecent(pkg: String) {
+        val list = (listOf(pkg) + recentPkgs().filter { it != pkg }).take(MAX_RECENT)
+        recentPrefs.edit().putString("recent", list.joinToString(",")).apply()
+    }
+
+    private fun rebuildRecent() {
+        recentRow.removeAllViews()
+        val show = cfg.showRecent && !cfg.kidsMode
+        if (!show) {
+            recentSection.visibility = View.GONE
+            return
+        }
+        val apps = collectApps()
+        val recent = recentPkgs().mapNotNull { apps[it] }
+        recent.forEach { app ->
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                isFocusable = true
+                isFocusableInTouchMode = true
+                background = focusableCardDrawable(Color.parseColor("#26FFFFFF"), dp(14))
+                setPadding(dp(12), dp(8), dp(16), dp(8))
+                layoutParams = LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(10) }
+                setOnClickListener { launchApp(app.pkg) }
+                setOnFocusChangeListener { v, hasFocus ->
+                    v.animate().scaleX(if (hasFocus) 1.06f else 1f).scaleY(if (hasFocus) 1.06f else 1f).setDuration(120).start()
+                }
+            }
+            card.addView(ImageView(this).apply {
+                setImageDrawable(app.icon)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+            }, LinearLayout.LayoutParams(dp(32), dp(32)))
+            card.addView(TextView(this).apply {
+                text = app.label
+                setTextColor(Color.WHITE)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                maxLines = 1
+                setPadding(dp(10), 0, 0, 0)
+            })
+            recentRow.addView(card)
+        }
+        recentSection.visibility = if (recent.isEmpty()) View.GONE else View.VISIBLE
+    }
+
+    // ---------- Chế độ trẻ em ----------
+
+    private fun setKidsMode(on: Boolean) {
+        ConfigStore.updateRaw(this) { it.put("kids_mode", on) }
+        reloadAll()
+    }
+
+    private fun onKidsPillClick() {
+        if (!cfg.kidsMode) {
+            if (cfg.kidsApps.isEmpty()) {
+                toast(tr("Giữ OK trên một app > Thêm vào danh sách trẻ em", "Hold OK on an app > Add to kids list first"))
+            } else {
+                setKidsMode(true)
+            }
+            return
+        }
+        if (cfg.kidsPin.isBlank()) {
+            setKidsMode(false)
+        } else {
+            askPin(tr("Nhập mã PIN để thoát", "Enter the PIN to exit")) { pin ->
+                if (pin == cfg.kidsPin) setKidsMode(false) else toast(tr("Sai mã PIN", "Wrong PIN"))
+            }
+        }
+    }
+
+    private fun onKidsPillLongClick() {
+        if (cfg.kidsMode) return
+        askPin(tr("Đặt mã PIN thoát chế độ trẻ em (để trống = không dùng PIN)", "Set a PIN to exit kids mode (empty = no PIN)")) { pin ->
+            ConfigStore.updateRaw(this) { it.put("kids_pin", pin) }
+            reloadAll()
+            toast(if (pin.isBlank()) tr("Đã bỏ mã PIN", "PIN removed") else tr("Đã đặt mã PIN", "PIN set"))
+        }
+    }
+
+    private fun askPin(title: String, onOk: (String) -> Unit) {
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            filters = arrayOf(InputFilter.LengthFilter(8))
+        }
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setView(input)
+            .setPositiveButton("OK") { _, _ -> onOk(input.text.toString().trim()) }
+            .setNegativeButton(tr("Huỷ", "Cancel"), null)
             .show()
+    }
+
+    // ---------- Menu giữ OK trên app ----------
+
+    private fun showAppMenu(app: AppEntry) {
+        val inKids = app.pkg in cfg.kidsApps
+        val items = listOf<Pair<String, () -> Unit>>(
+            tr("Đưa lên đầu", "Move to first") to { moveApp(app.pkg, MOVE_FIRST) },
+            tr("Dịch sang trái", "Move left") to { moveApp(app.pkg, MOVE_LEFT) },
+            tr("Dịch sang phải", "Move right") to { moveApp(app.pkg, MOVE_RIGHT) },
+            tr("Ẩn khỏi màn hình chính", "Hide from Home") to {
+                ConfigStore.updateRaw(this) { j ->
+                    val arr = j.optJSONArray("hidden_apps") ?: JSONArray()
+                    arr.put(app.pkg)
+                    j.put("hidden_apps", arr)
+                }
+                reloadAll()
+            },
+            (if (inKids) tr("Bỏ khỏi danh sách trẻ em", "Remove from kids list")
+            else tr("Thêm vào danh sách trẻ em", "Add to kids list")) to { toggleKidsApp(app.pkg, !inKids) },
+            tr("Thông tin ứng dụng", "App info") to {
+                runCatching {
+                    startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${app.pkg}"))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }
+            },
+            tr("Gỡ cài đặt", "Uninstall") to {
+                runCatching {
+                    startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:${app.pkg}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }.onFailure { toast(tr("Không gỡ được app này", "Could not uninstall this app")) }
+            },
+        )
+        AlertDialog.Builder(this)
+            .setTitle(app.label)
+            .setItems(items.map { it.first }.toTypedArray()) { _, which -> items[which].second() }
+            .show()
+    }
+
+    /** Đổi chỗ app: ghi lại toàn bộ thứ tự đang hiện vào dock_apps (mục giả của ô kênh giữ nguyên ở cuối). */
+    private fun moveApp(pkg: String, how: Int) {
+        val list = orderedApps().map { it.pkg }.toMutableList()
+        val i = list.indexOf(pkg)
+        if (i < 0) return
+        list.removeAt(i)
+        val j = when (how) {
+            MOVE_FIRST -> 0
+            MOVE_LEFT -> maxOf(0, i - 1)
+            else -> minOf(list.size, i + 1)
+        }
+        list.add(j, pkg)
+        val giuLai = cfg.dockApps.filter { it !in list }
+        ConfigStore.updateRaw(this) { it.put("dock_apps", JSONArray(list + giuLai)) }
+        reloadAll()
+    }
+
+    private fun toggleKidsApp(pkg: String, add: Boolean) {
+        ConfigStore.updateRaw(this) { j ->
+            val set = LinkedHashSet<String>()
+            j.optJSONArray("kids_apps")?.let { a -> for (k in 0 until a.length()) set += a.optString(k) }
+            if (add) set += pkg else set -= pkg
+            j.put("kids_apps", JSONArray(set.toList()))
+        }
+        reloadAll()
+        toast(if (add) tr("Đã thêm vào danh sách trẻ em", "Added to kids list") else tr("Đã bỏ khỏi danh sách trẻ em", "Removed from kids list"))
+    }
+
+    private companion object {
+        const val MAX_RECENT = 8
+        const val MOVE_FIRST = 0
+        const val MOVE_LEFT = -1
+        const val MOVE_RIGHT = 1
     }
 
     private data class AppEntry(val pkg: String, val label: String, val icon: Drawable)

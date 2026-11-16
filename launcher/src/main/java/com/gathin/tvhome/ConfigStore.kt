@@ -48,6 +48,18 @@ data class LauncherConfig(
     val hiddenApps: Set<String> = emptySet(),
     val libraryApps: Set<String> = emptySet(),
     val linkTiles: List<LinkTile> = emptyList(),
+    /** Hàng tiện ích nhanh (âm lượng, tắt tiếng, dọn RAM, Wi-Fi, màn chờ). */
+    val showQuickActions: Boolean = true,
+    /** Hàng "Mở gần đây". */
+    val showRecent: Boolean = true,
+    /** Hàng nguồn vào (HDMI, AV...). */
+    val showInputs: Boolean = true,
+    /** Nút Trẻ em trên thanh trên cùng. */
+    val showKidsButton: Boolean = true,
+    /** Chế độ trẻ em đang bật: chỉ hiện [kidsApps], thoát bằng [kidsPin] nếu có đặt. */
+    val kidsMode: Boolean = false,
+    val kidsApps: Set<String> = emptySet(),
+    val kidsPin: String = "",
     val raw: JSONObject = JSONObject(),
 )
 
@@ -145,6 +157,13 @@ object ConfigStore {
             hiddenApps = strList("hidden_apps").toSet(),
             libraryApps = strList("library_apps").toSet(),
             linkTiles = tiles,
+            showQuickActions = j.optBoolean("show_quick_actions", true),
+            showRecent = j.optBoolean("show_recent", true),
+            showInputs = j.optBoolean("show_inputs", true),
+            showKidsButton = j.optBoolean("show_kids_button", true),
+            kidsMode = j.optBoolean("kids_mode", false),
+            kidsApps = strList("kids_apps").toSet(),
+            kidsPin = j.optString("kids_pin", ""),
             raw = j,
         )
     }

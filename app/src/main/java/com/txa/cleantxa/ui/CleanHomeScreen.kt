@@ -373,6 +373,66 @@ private fun SettingsTab(vm: PhienLamViec) {
         if (uri != null) vm.nhapCauHinh(uri)
     }
 
+    TxaCard(title = t("Chọn kiểu Home", "Choose the Home"), icon = Icons.Default.Tune) {
+        Text(
+            t(
+                "Hai Home cùng có trong app. Chọn một rồi bấm Áp dụng; Home kia sẽ được gỡ khỏi tivi.",
+                "Both Homes ship with the app. Pick one and press Apply; the other is removed from the TV.",
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FilterChip(
+                selected = !vm.homeTxa,
+                onClick = { vm.chonHomeTxa(false) },
+                label = { Text(t("Home sạch (CleanYourTV)", "Clean Home (CleanYourTV)")) },
+            )
+            FilterChip(
+                selected = vm.homeTxa,
+                onClick = { vm.chonHomeTxa(true) },
+                label = { Text(t("CleanTxa Home (tuỳ biến)", "CleanTxa Home (custom)")) },
+            )
+        }
+        if (vm.homeTxa) {
+            Spacer(Modifier.height(8.dp))
+            ToggleRow(
+                title = t("Hàng tiện ích nhanh", "Quick actions row"),
+                subtitle = t("Âm lượng, tắt tiếng, dọn RAM, màn hình chờ.", "Volume, mute, free RAM, screensaver."),
+                checked = vm.txaNhanh,
+                onCheckedChange = { vm.txaNhanh = it; vm.luuTuyChonTxa() },
+            )
+            ToggleRow(
+                title = t("Hàng Mở gần đây", "Recent apps row"),
+                checked = vm.txaGanDay,
+                onCheckedChange = { vm.txaGanDay = it; vm.luuTuyChonTxa() },
+            )
+            ToggleRow(
+                title = t("Hàng nguồn vào (HDMI, AV)", "Inputs row (HDMI, AV)"),
+                checked = vm.txaNguon,
+                onCheckedChange = { vm.txaNguon = it; vm.luuTuyChonTxa() },
+            )
+            ToggleRow(
+                title = t("Nút Chế độ trẻ em", "Kids mode button"),
+                subtitle = t(
+                    "Trên tivi: giữ OK trên app > Thêm vào danh sách trẻ em; giữ OK trên nút Trẻ em để đặt mã PIN.",
+                    "On the TV: hold OK on an app > Add to kids list; hold OK on the Kids button to set a PIN.",
+                ),
+                checked = vm.txaNutTreEm,
+                onCheckedChange = { vm.txaNutTreEm = it; vm.luuTuyChonTxa() },
+            )
+            Text(
+                t(
+                    "Không dùng được trên tivi Xiaomi bản Trung Quốc (hãng chỉ nhận Home trong danh sách của họ); ở đó app tự dùng Home sạch dành cho Xiaomi.",
+                    "Not available on China-market Xiaomi TVs (the maker only accepts Homes on its own list); there the app uses the Xiaomi clean Home instead.",
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+
     TxaCard(title = t("Bố cục & Hiển thị", "Layout & Display"), icon = Icons.Default.Settings) {
         Text(t("Số app mỗi hàng: ${if (vm.soCot == 0) t("Mặc định", "Default") else vm.soCot}", "Apps per row: ${if (vm.soCot == 0) t("Default", "Default") else vm.soCot}"), style = MaterialTheme.typography.bodyMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
