@@ -29,7 +29,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
@@ -517,10 +520,28 @@ private fun CleanTxaTopBar(vm: PhienLamViec) {
                     Icon(Icons.AutoMirrored.Filled.HelpOutline, contentDescription = t("Hướng dẫn", "Guide"))
                 }
             }
-            TextButton(onClick = { NgonNgu.doi(ctx) }) {
-                Icon(Icons.Default.Language, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(if (NgonNgu.tiengViet) "VI" else "EN", fontWeight = FontWeight.Bold)
+            var menuNgonNgu by remember { mutableStateOf(false) }
+            Box {
+                TextButton(onClick = { menuNgonNgu = true }) {
+                    Icon(Icons.Default.Language, contentDescription = t("Ngôn ngữ", "Language"), modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (NgonNgu.tiengViet) "VI" else "EN", fontWeight = FontWeight.Bold)
+                }
+                DropdownMenu(expanded = menuNgonNgu, onDismissRequest = { menuNgonNgu = false }) {
+                    listOf(
+                        NgonNgu.Che.HE_THONG to t("Theo hệ thống", "System default"),
+                        NgonNgu.Che.VI to "Tiếng Việt",
+                        NgonNgu.Che.EN to "English",
+                    ).forEach { (che, nhan) ->
+                        DropdownMenuItem(
+                            text = { Text(nhan) },
+                            onClick = { menuNgonNgu = false; NgonNgu.chon(ctx, che) },
+                            trailingIcon = {
+                                if (NgonNgu.che == che) Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                            },
+                        )
+                    }
+                }
             }
         },
     )

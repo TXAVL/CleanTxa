@@ -1,5 +1,6 @@
 package com.txa.cleantxa.ui
 
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -21,66 +22,33 @@ import com.txa.cleantxa.BuildConfig
 import com.txa.cleantxa.NgonNgu
 import com.txa.cleantxa.t
 
+/** Dòng ngăn giữa phần giới thiệu và phần toàn văn giấy phép trong file giấy phép. */
+internal const val DAU_TACH_GIAY_PHEP = "@@LICENSE-TEXTS@@"
+
+/** Tên file giấy phép theo ngôn ngữ app: giay-phep-vi.txt hoặc giay-phep-en.txt (trong assets). */
+internal fun tenFileGiayPhep(tiengViet: Boolean) = if (tiengViet) "giay-phep-vi.txt" else "giay-phep-en.txt"
+
+/** Tách nội dung file giấy phép thành (phần giới thiệu, phần toàn văn giấy phép) và điền số phiên bản. */
+internal fun tachGiayPhep(raw: String, phienBan: String): Pair<String, String> {
+    val noiDung = raw.replace("{{VERSION}}", phienBan)
+    val i = noiDung.indexOf(DAU_TACH_GIAY_PHEP)
+    return if (i < 0) noiDung.trim() to ""
+    else noiDung.substring(0, i).trim() to noiDung.substring(i + DAU_TACH_GIAY_PHEP.length).trim()
+}
+
+private fun napGiayPhep(ctx: Context, tiengViet: Boolean): Pair<String, String> {
+    val raw = runCatching {
+        ctx.assets.open(tenFileGiayPhep(tiengViet)).bufferedReader(Charsets.UTF_8).use { it.readText() }
+    }.getOrDefault("")
+    return tachGiayPhep(raw, BuildConfig.VERSION_NAME)
+}
+
 @Composable
 fun LicensesScreen() {
     val ctx = LocalContext.current
-    // Đọc NgonNgu.tiengViet trực tiếp để Compose tự vẽ lại ngay khi người dùng bấm đổi VI / EN
+    // Đọc NgonNgu.tiengViet trực tiếp để Compose vẽ lại và nạp lại đúng file ngay khi người dùng bấm đổi VI / EN.
     val isVi = NgonNgu.tiengViet
-    val licenseBody = remember {
-        runCatching { ctx.assets.open("giay-phep.txt").bufferedReader().readText() }.getOrDefault("")
-    }
-
-    val headerText = if (isVi) {
-        """
-        CleanTxa ${BuildConfig.VERSION_NAME} — TXAVL (https://github.com/TXAVL/CleanTxa)
-        Phần mềm miễn phí, cung cấp nguyên trạng, không kèm bảo hành.
-
-        QUYỀN RIÊNG TƯ & HOẠT ĐỘNG CỤC BỘ
-        • CleanTxa hoạt động cục bộ qua Wi-Fi ADB giữa điện thoại và tivi của bạn.
-        • Không thu thập tài khoản, không gửi dữ liệu người dùng hay danh sách ứng dụng lên máy chủ bên thứ ba.
-        • Kết nối mạng chỉ dùng khi: kiểm tra phiên bản mới trên GitHub Releases, tải thời tiết (Open-Meteo), hoặc bạn chủ động dùng máy chủ logs cục bộ cổng 2311 trong mạng Wi-Fi nhà bạn.
-
-        THÀNH PHẦN MÃ NGUỒN MỞ SỬ DỤNG
-        1. LibADB Android — Muntashir Al-Islam (Apache License 2.0)
-           https://github.com/MuntashirAkon/libadb-android
-        2. Conscrypt — Google (Apache License 2.0)
-           https://github.com/google/conscrypt
-        3. AndroidX, Jetpack Compose, Kotlin — Google / JetBrains (Apache License 2.0)
-        4. Bouncy Castle — Legion of the Bouncy Castle Inc. (MIT License)
-           https://www.bouncycastle.org
-        5. ZXing Core — ZXing Authors (Apache License 2.0)
-           https://github.com/zxing/zxing
-        6. Dữ liệu thời tiết: Open-Meteo (CC BY 4.0) · Địa danh: © OpenStreetMap contributors (ODbL 1.0)
-        7. DNS chặn quảng cáo (tuỳ chọn): AdGuard DNS — https://adguard-dns.io
-
-        Tên các hãng tivi chỉ dùng để mô tả khả năng tương thích; CleanTxa không liên kết với các hãng đó.
-        """.trimIndent()
-    } else {
-        """
-        CleanTxa ${BuildConfig.VERSION_NAME} — TXAVL (https://github.com/TXAVL/CleanTxa)
-        Free software, provided "as is", without warranty.
-
-        PRIVACY & LOCAL-FIRST OPERATION
-        • CleanTxa runs locally over Wi-Fi ADB between your phone and your TV.
-        • No account is required, and no user telemetry or installed app lists are sent to third-party servers.
-        • Network access is only used to check GitHub Releases for app updates, fetch optional weather data (Open-Meteo), or serve the local log viewer on port 2311 over your own Wi-Fi.
-
-        OPEN-SOURCE LIBRARIES USED
-        1. LibADB Android — Muntashir Al-Islam (Apache License 2.0)
-           https://github.com/MuntashirAkon/libadb-android
-        2. Conscrypt — Google (Apache License 2.0)
-           https://github.com/google/conscrypt
-        3. AndroidX, Jetpack Compose, Kotlin — Google / JetBrains (Apache License 2.0)
-        4. Bouncy Castle — Legion of the Bouncy Castle Inc. (MIT License)
-           https://www.bouncycastle.org
-        5. ZXing Core — ZXing Authors (Apache License 2.0)
-           https://github.com/zxing/zxing
-        6. Weather data: Open-Meteo (CC BY 4.0) · Place coordinates: © OpenStreetMap contributors (ODbL 1.0)
-        7. Optional ad-blocking DNS: AdGuard DNS — https://adguard-dns.io
-
-        TV brand names are only used to describe compatibility; CleanTxa is not affiliated with them.
-        """.trimIndent()
-    }
+    val (gioiThieu, toanVan) = remember(isVi) { napGiayPhep(ctx, isVi) }
 
     Column(
         Modifier
@@ -97,16 +65,19 @@ fun LicensesScreen() {
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                headerText,
+                gioiThieu.ifBlank { t("Không đọc được nội dung giấy phép.", "The license text could not be loaded.") },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,
             )
         }
-        Text(
-            licenseBody,
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (toanVan.isNotBlank()) {
+            Text(
+                toanVan,
+                style = MaterialTheme.typography.bodySmall,
+                // Chữ đều nét (monospace) làm mất dấu tiếng Việt ở nhiều máy: chỉ dùng cho bản tiếng Anh.
+                fontFamily = if (isVi) FontFamily.Default else FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
