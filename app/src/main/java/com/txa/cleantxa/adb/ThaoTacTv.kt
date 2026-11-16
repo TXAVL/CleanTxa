@@ -315,13 +315,17 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
         runCatching {
             val gon = b.copy(getprop = "", goiTruoc = emptyList()).toJson().toString().toByteArray()
             adb.ghiFile("$TEP_SAO_LUU_TV.tam", gon)
-            sh("mv -f $TEP_SAO_LUU_TV.tam $TEP_SAO_LUU_TV")
+            sh("mv -f $TEP_SAO_LUU_TV.tam $TEP_SAO_LUU_TV; rm -f $TEP_SAO_LUU_TV_CU")
         }
     }
 
-    /** Bản sao lưu nằm trên tivi (do điện thoại nào cũng được ghi), đúng tivi này; null nếu không có / hỏng. */
+    /**
+     * Bản sao lưu nằm trên tivi (do điện thoại nào cũng được ghi), đúng tivi này; null nếu không có / hỏng.
+     * Đọc tên mới (cleantxa-sao-luu.json), không có thì tên cũ (cleantv-sao-luu.json) của bản app trước.
+     */
     fun docSaoLuuTrenTv(khoa: String): BanSaoLuu? = runCatching {
-        BanSaoLuu.tuJson(org.json.JSONObject(sh("cat $TEP_SAO_LUU_TV 2>/dev/null").trim()))
+        val noiDung = sh("cat $TEP_SAO_LUU_TV 2>/dev/null").trim().ifBlank { sh("cat $TEP_SAO_LUU_TV_CU 2>/dev/null").trim() }
+        BanSaoLuu.tuJson(org.json.JSONObject(noiDung))
     }.getOrNull()?.takeIf { it.khoa == khoa }
 
     fun damBaoSaoLuu(tv: ThongTinTv, getprop: String, ip: String): BanSaoLuu {
@@ -1332,7 +1336,7 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
 
     // ---------- Khôi phục ----------
 
-    fun xoaSaoLuuTrenTv() { runCatching { sh("rm -f $TEP_SAO_LUU_TV") } }
+    fun xoaSaoLuuTrenTv() { runCatching { sh("rm -f $TEP_SAO_LUU_TV $TEP_SAO_LUU_TV_CU") } }
 
     /**
      * Bật một gói, chờ tối đa [giay] giây (06/11/2026, Sony VU3 ngocnd156: pm enable treo 30 phút, phải rút điện).
@@ -1707,7 +1711,9 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
         /** versionCode của khoa.apk đi kèm (2 = khoá từng app); tivi có bản thấp hơn thì cài đè. */
         const val KHOA_BAN = 2
         /** Bản sao lưu trên tivi: thư mục của shell, còn sau khi gỡ app / Home sạch, chỉ mất khi khôi phục cài đặt gốc. */
-        const val TEP_SAO_LUU_TV = "/data/local/tmp/cleantv-sao-luu.json"
+        const val TEP_SAO_LUU_TV = "/data/local/tmp/cleantxa-sao-luu.json"
+        /** Tên cũ của file sao lưu trên tivi (bản app ≤ 1.3.3): vẫn đọc được, ghi mới thì xoá. */
+        const val TEP_SAO_LUU_TV_CU = "/data/local/tmp/cleantv-sao-luu.json"
         const val GAC = "/data/local/tmp/cleantv-gac"
         const val HEN_TAT_ADB = "/data/local/tmp/cleantv-tat-adb"
         const val HEN_TAT_TV = "/data/local/tmp/cleantv-hen-tat"

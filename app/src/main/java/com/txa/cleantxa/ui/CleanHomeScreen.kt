@@ -433,6 +433,8 @@ private fun HomeTab(vm: PhienLamViec, onOpenIptv: () -> Unit) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TuyChinhTab(vm: PhienLamViec, onOpenWeather: () -> Unit) {
+    if (vm.homeTxa) TxaHomeTuyChinh(vm)
+
     TxaCard(
         title = t("Lời chào & Lịch âm", "Greeting & Lunar calendar"),
     ) {
@@ -589,7 +591,24 @@ private fun SettingsTab(vm: PhienLamViec) {
 private fun XemTruoc(vm: PhienLamViec) {
     val th = vm.themeChon
     val mau = th.mau.map { Color(it) }.let { if (it.size >= 2) it else it + it }
-    val gio = remember { java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")) }
+    // Với CleanTxa Home, xem trước theo các công tắc đồng hồ: ẩn / hiện, giây, ngày, 12 / 24 giờ.
+    val hienDongHo = !vm.homeTxa || vm.txaDongHo
+    val gio24 = !vm.homeTxa || vm.txa24h
+    val coGiay = vm.homeTxa && vm.txaGiay
+    val hienNgay = hienDongHo && (!vm.homeTxa || vm.txaNgay)
+    val gio = remember(gio24, coGiay) {
+        java.time.LocalTime.now().format(
+            java.time.format.DateTimeFormatter.ofPattern(
+                when { gio24 && coGiay -> "HH:mm:ss"; gio24 -> "HH:mm"; coGiay -> "h:mm:ss a"; else -> "h:mm a" },
+            ),
+        )
+    }
+    val ngay = remember(hienNgay) {
+        val vi = java.util.Locale.getDefault().language == "vi"
+        java.time.LocalDate.now().format(
+            java.time.format.DateTimeFormatter.ofPattern(if (vi) "EEEE, dd/MM/yyyy" else "EEEE, d MMMM yyyy", if (vi) java.util.Locale("vi", "VN") else java.util.Locale.getDefault()),
+        )
+    }
     val anh = anhXemTruoc(vm.anhNenRieng, 4)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(
@@ -610,8 +629,14 @@ private fun XemTruoc(vm: PhienLamViec) {
                 Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = (vm.lamToiNen / 100f).coerceIn(0f, 0.8f))))
             }
             Column(Modifier.padding(18.dp)) {
-                Text(gio, color = Color.White, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Light)
-                if (vm.amLich) Text(t("âm lịch", "lunar date"), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelMedium)
+                if (hienDongHo) Text(gio, color = Color.White, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Light)
+                if (hienNgay) {
+                    Text(
+                        ngay + if (vm.amLich) " · " + t("âm lịch", "lunar") else "",
+                        color = Color.White.copy(alpha = 0.85f),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
             }
             Row(
                 Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(14.dp),
@@ -698,5 +723,66 @@ private fun anhXemTruoc(bytes: ByteArray?, thu: Int): ImageBitmap? = remember(by
         runCatching {
             BitmapFactory.decodeByteArray(it, 0, it.size, BitmapFactory.Options().apply { inSampleSize = thu })?.asImageBitmap()
         }.getOrNull()
+    }
+}
+
+/** Tuỳ chỉnh riêng của CleanTxa Home: đồng hồ & ngày, cỡ ô app, các nút trên thanh trên cùng. Chỉ hiện khi đang chọn kiểu Home này. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TxaHomeTuyChinh(vm: PhienLamViec) {
+    TxaCard(title = t("Đồng hồ & ngày", "Clock & date"), icon = Icons.Default.Tune) {
+        ToggleRow(
+            title = t("Hiện đồng hồ", "Show the clock"),
+            subtitle = t("Ẩn thì ẩn luôn dòng ngày.", "Hiding it also hides the date line."),
+            checked = vm.txaDongHo,
+            onCheckedChange = { vm.txaDongHo = it; vm.luuTuyChonTxa() },
+        )
+        if (vm.txaDongHo) {
+            ToggleRow(
+                title = t("Hiện giây", "Show seconds"),
+                checked = vm.txaGiay,
+                onCheckedChange = { vm.txaGiay = it; vm.luuTuyChonTxa() },
+            )
+            ToggleRow(
+                title = t("Hiện ngày", "Show the date"),
+                subtitle = t("Bật \"Hiện lịch âm\" bên dưới để thêm ngày âm lịch.", "Turn on \"Show Vietnamese lunar date\" below to add the lunar date."),
+                checked = vm.txaNgay,
+                onCheckedChange = { vm.txaNgay = it; vm.luuTuyChonTxa() },
+            )
+            ToggleRow(
+                title = t("Giờ 24 giờ", "24-hour clock"),
+                checked = vm.txa24h,
+                onCheckedChange = { vm.txa24h = it; vm.luuTuyChonTxa() },
+            )
+        }
+    }
+
+    TxaCard(title = t("Ô ứng dụng & thanh trên", "App tiles & top bar"), icon = Icons.Default.Apps) {
+        Text(t("Cỡ ô ứng dụng", "App tile size"), style = MaterialTheme.typography.bodyMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("small" to t("Nhỏ", "Small"), "medium" to t("Vừa", "Medium"), "large" to t("Lớn", "Large")).forEach { (khoa, nhan) ->
+                FilterChip(
+                    selected = vm.txaCoO == khoa,
+                    onClick = { vm.txaCoO = khoa; vm.luuTuyChonTxa() },
+                    label = { Text(nhan) },
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        ToggleRow(
+            title = t("Nút Wi-Fi", "Wi-Fi button"),
+            checked = vm.txaNutWifi,
+            onCheckedChange = { vm.txaNutWifi = it; vm.luuTuyChonTxa() },
+        )
+        ToggleRow(
+            title = t("Nút Cài đặt", "Settings button"),
+            checked = vm.txaNutCaiDat,
+            onCheckedChange = { vm.txaNutCaiDat = it; vm.luuTuyChonTxa() },
+        )
+        ToggleRow(
+            title = t("Hiện địa chỉ IP của tivi", "Show the TV's IP address"),
+            checked = vm.txaHienIp,
+            onCheckedChange = { vm.txaHienIp = it; vm.luuTuyChonTxa() },
+        )
     }
 }

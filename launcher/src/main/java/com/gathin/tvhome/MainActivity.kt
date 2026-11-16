@@ -171,7 +171,7 @@ class MainActivity : Activity() {
         }
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(40), dp(28), dp(40), dp(36))
+            setPadding(dp(56), dp(32), dp(56), dp(40))
         }
 
         // Top action bar
@@ -186,20 +186,27 @@ class MainActivity : Activity() {
         greetingText = TextView(this).apply {
             setTextColor(Color.parseColor("#2EC4B6"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            letterSpacing = 0.03f
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         }
         clockText = TextView(this).apply {
             setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 48f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 64f)
+            letterSpacing = -0.02f
+            includeFontPadding = false
             typeface = android.graphics.Typeface.create("sans-serif-light", android.graphics.Typeface.NORMAL)
+            // Bóng nhẹ cho chữ đọc được cả trên ảnh nền sáng.
+            setShadowLayer(14f, 0f, 2f, Color.argb(120, 0, 0, 0))
         }
         dateText = TextView(this).apply {
-            setTextColor(Color.parseColor("#B4C0CC"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(Color.parseColor("#D2DBE4"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setPadding(0, dp(2), 0, 0)
         }
         weatherText = TextView(this).apply {
             setTextColor(Color.parseColor("#B6F2EA"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            setPadding(0, dp(4), 0, 0)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            setPadding(0, dp(6), 0, 0)
             visibility = View.GONE
         }
         leftHeader.addView(greetingText)
@@ -259,9 +266,7 @@ class MainActivity : Activity() {
         // Apps section header
         appsLabel = TextView(this).apply {
             text = tr("Ứng dụng", "Apps")
-            setTextColor(Color.parseColor("#9FB0C0"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            setPadding(dp(4), dp(18), 0, dp(10))
+            kieuNhanMuc(this)
         }
         content.addView(appsLabel)
 
@@ -274,34 +279,68 @@ class MainActivity : Activity() {
         rootFrame.addView(mainScroll, FrameLayout.LayoutParams(-1, -1))
     }
 
+    /** Nhãn đầu mỗi mục (Ứng dụng, Nguồn vào…): chữ hoa nhỏ, giãn chữ, màu dịu để không tranh với ô app. */
+    private fun kieuNhanMuc(tv: TextView) {
+        tv.setTextColor(Color.parseColor("#8DA0B3"))
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        tv.isAllCaps = true
+        tv.letterSpacing = 0.12f
+        tv.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+        tv.setPadding(dp(4), dp(24), 0, dp(10))
+    }
+
     private fun makePill(label: String, onClick: () -> Unit): TextView {
+        val chu = Color.WHITE
+        val chuKhiChon = Color.parseColor("#0B1118")
         return TextView(this).apply {
             text = label
-            setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            setPadding(dp(16), dp(9), dp(16), dp(9))
+            setTextColor(chu)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            setPadding(dp(20), dp(11), dp(20), dp(11))
             isFocusable = true
             isFocusableInTouchMode = true
-            background = focusableCardDrawable(Color.parseColor("#24FFFFFF"), dp(20))
+            background = pillDrawable()
             val lp = LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(10) }
             layoutParams = lp
             setOnClickListener { onClick() }
             setOnFocusChangeListener { v, hasFocus ->
-                v.animate().scaleX(if (hasFocus) 1.07f else 1f).scaleY(if (hasFocus) 1.07f else 1f).setDuration(120).start()
+                (v as TextView).setTextColor(if (hasFocus) chuKhiChon else chu)
+                v.animate().scaleX(if (hasFocus) 1.06f else 1f).scaleY(if (hasFocus) 1.06f else 1f).setDuration(120).start()
             }
         }
     }
 
+    /** Nút viên thuốc: nền kính mờ; được chọn thì sáng trắng (chữ chuyển tối) để nhìn rõ từ xa. */
+    private fun pillDrawable(): StateListDrawable {
+        val radius = dp(28).toFloat()
+        val chon = GradientDrawable().apply {
+            setColor(Color.parseColor("#F5FFFFFF"))
+            cornerRadius = radius
+        }
+        val thuong = GradientDrawable().apply {
+            setColor(Color.parseColor("#1FFFFFFF"))
+            cornerRadius = radius
+            setStroke(dp(1), Color.parseColor("#2EFFFFFF"))
+        }
+        return StateListDrawable().apply {
+            addState(intArrayOf(android.R.attr.state_focused), chon)
+            addState(intArrayOf(android.R.attr.state_selected), chon)
+            addState(intArrayOf(), thuong)
+        }
+    }
+
+    /** Ô app / ô kênh: được chọn thì có vòng trắng dày (kiểu launcher tivi), giữ nguyên màu nền của ô. */
     private fun focusableCardDrawable(normalColor: Int, radiusPx: Int): StateListDrawable {
         val focused = GradientDrawable().apply {
             setColor(normalColor)
             cornerRadius = radiusPx.toFloat()
-            setStroke(dp(2), Color.parseColor("#2EC4B6"))
+            setStroke(dp(3), Color.WHITE)
         }
         val normal = GradientDrawable().apply {
             setColor(normalColor)
             cornerRadius = radiusPx.toFloat()
-            setStroke(dp(1), Color.parseColor("#22FFFFFF"))
+            setStroke(dp(1), Color.parseColor("#1FFFFFFF"))
         }
         return StateListDrawable().apply {
             addState(intArrayOf(android.R.attr.state_focused), focused)
@@ -319,8 +358,8 @@ class MainActivity : Activity() {
         updateWeather()
         val kids = cfg.kidsMode
         nowPlayingBtn.visibility = if (cfg.showNowPlaying && !kids) View.VISIBLE else View.GONE
-        wifiPill.visibility = if (kids) View.GONE else View.VISIBLE
-        settingsPill.visibility = if (kids) View.GONE else View.VISIBLE
+        wifiPill.visibility = if (kids || !cfg.showWifiButton) View.GONE else View.VISIBLE
+        settingsPill.visibility = if (kids || !cfg.showSettingsButton) View.GONE else View.VISIBLE
         kidsPill.visibility = if (cfg.showKidsButton || kids) View.VISIBLE else View.GONE
         kidsPill.text = if (kids) tr("Thoát chế độ trẻ em", "Exit kids mode") else tr("Trẻ em", "Kids")
         appsLabel.text = if (kids) tr("Ứng dụng cho bé", "Apps for kids") else tr("Ứng dụng", "Apps")
@@ -388,11 +427,23 @@ class MainActivity : Activity() {
     }
 
     private fun updateClock() {
+        // Ẩn đồng hồ thì ẩn luôn dòng ngày; hiện thì có thêm tuỳ chọn giây, ngày, 12 / 24 giờ.
+        clockText.visibility = if (cfg.showClock) View.VISIBLE else View.GONE
+        dateText.visibility = if (cfg.showClock && cfg.showDate) View.VISIBLE else View.GONE
+        if (!cfg.showClock) return
         val now = Date()
-        val fmt = if (cfg.showClockSeconds) "HH:mm:ss" else "HH:mm"
+        val fmt = when {
+            cfg.clock24h && cfg.showClockSeconds -> "HH:mm:ss"
+            cfg.clock24h -> "HH:mm"
+            cfg.showClockSeconds -> "h:mm:ss a"
+            else -> "h:mm a"
+        }
         clockText.text = SimpleDateFormat(fmt, Locale.getDefault()).format(now)
-        val solar = SimpleDateFormat("EEEE, dd/MM/yyyy", Locale("vi", "VN")).format(now)
-        dateText.text = if (cfg.showLunarCalendar) "$solar  ·  ${LunarCalendar.formatToday()}" else solar
+        if (cfg.showDate) {
+            val vi = Locale.getDefault().language == "vi"
+            val solar = SimpleDateFormat(if (vi) "EEEE, dd/MM/yyyy" else "EEEE, d MMMM yyyy", if (vi) Locale("vi", "VN") else Locale.getDefault()).format(now)
+            dateText.text = if (cfg.showLunarCalendar && vi) "$solar  ·  ${LunarCalendar.formatToday()}" else solar
+        }
         if (cfg.headerWhite) {
             clockText.setTextColor(Color.WHITE)
         }
@@ -493,12 +544,12 @@ class MainActivity : Activity() {
         }
 
         val cardBg = if (cfg.dockGlass) Color.parseColor("#26FFFFFF") else Color.parseColor("#182430")
-        val screenW = resources.displayMetrics.widthPixels - dp(80)
+        val screenW = resources.displayMetrics.widthPixels - dp(112)
         val tileW = (screenW / cfg.columns) - dp(12)
         val (tileH, iconDp) = when (cfg.tileScale) {
-            "small" -> dp(94) to dp(40)
-            "large" -> dp(132) to dp(60)
-            else -> dp(112) to dp(48)
+            "small" -> dp(104) to dp(44)
+            "large" -> dp(150) to dp(68)
+            else -> dp(126) to dp(56)
         }
 
         ordered.forEach { app ->
@@ -534,10 +585,11 @@ class MainActivity : Activity() {
             val titleView = TextView(this).apply {
                 text = app.label
                 setTextColor(Color.WHITE)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
                 gravity = Gravity.CENTER
                 maxLines = 1
-                setPadding(0, dp(8), 0, 0)
+                setPadding(0, dp(10), 0, 0)
             }
             card.addView(titleView, LinearLayout.LayoutParams(-1, -2))
             appsGrid.addView(card)
@@ -602,9 +654,7 @@ class MainActivity : Activity() {
         }
         section.addView(TextView(this).apply {
             text = title
-            setTextColor(Color.parseColor("#9FB0C0"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            setPadding(dp(4), dp(18), 0, dp(8))
+            kieuNhanMuc(this)
         })
         val scroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }

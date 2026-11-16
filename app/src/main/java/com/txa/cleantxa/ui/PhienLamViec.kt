@@ -108,9 +108,23 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     var txaGanDay by mutableStateOf(prefs.getBoolean("txa_gan_day", true))
     var txaNguon by mutableStateOf(prefs.getBoolean("txa_nguon", true))
     var txaNutTreEm by mutableStateOf(prefs.getBoolean("txa_nut_tre", true))
+    // Đồng hồ: ẩn thì ẩn luôn dòng ngày; hiện thì có thêm giây, ngày, 12 / 24 giờ.
+    var txaDongHo by mutableStateOf(prefs.getBoolean("txa_dong_ho", true))
+    var txaGiay by mutableStateOf(prefs.getBoolean("txa_giay", false))
+    var txaNgay by mutableStateOf(prefs.getBoolean("txa_ngay", true))
+    var txa24h by mutableStateOf(prefs.getBoolean("txa_24h", true))
+    /** Cỡ ô app: "small" | "medium" | "large". */
+    var txaCoO by mutableStateOf(prefs.getString("txa_co_o", "medium") ?: "medium")
+    var txaNutWifi by mutableStateOf(prefs.getBoolean("txa_nut_wifi", true))
+    var txaNutCaiDat by mutableStateOf(prefs.getBoolean("txa_nut_cai_dat", true))
+    var txaHienIp by mutableStateOf(prefs.getBoolean("txa_hien_ip", false))
     fun luuTuyChonTxa() {
         prefs.edit().putBoolean("txa_nhanh", txaNhanh).putBoolean("txa_gan_day", txaGanDay)
-            .putBoolean("txa_nguon", txaNguon).putBoolean("txa_nut_tre", txaNutTreEm).apply()
+            .putBoolean("txa_nguon", txaNguon).putBoolean("txa_nut_tre", txaNutTreEm)
+            .putBoolean("txa_dong_ho", txaDongHo).putBoolean("txa_giay", txaGiay).putBoolean("txa_ngay", txaNgay)
+            .putBoolean("txa_24h", txa24h).putString("txa_co_o", txaCoO)
+            .putBoolean("txa_nut_wifi", txaNutWifi).putBoolean("txa_nut_cai_dat", txaNutCaiDat).putBoolean("txa_hien_ip", txaHienIp)
+            .apply()
     }
 
     var man by mutableStateOf(Man.CHINH)
@@ -1568,6 +1582,15 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
             put("show_now_playing", nutDangPhat)
             put("show_input_button", nutInput)
             if (soCot > 0) put("columns", soCot)
+            put("show_clock", txaDongHo)
+            put("show_clock_seconds", txaGiay)
+            put("show_date", txaNgay)
+            put("clock_24h", txa24h)
+            put("show_lunar_calendar", amLich)
+            put("tile_scale", txaCoO)
+            put("show_wifi_button", txaNutWifi)
+            put("show_settings_button", txaNutCaiDat)
+            put("show_network_ip", txaHienIp)
         }
         put("uniform_tiles", oDeuNhau)
         if (moKhiBat) put("open_on_start_choice", true)
@@ -1729,9 +1752,14 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
      */
     private suspend fun luuKichBanVaoTv() {
         if (saoLuu == null) return
-        runCatching { val chu = kichBan(); io { tv.ghiVaoDownload(tenFileKichBan, chu.toByteArray()) } }.onSuccess { p ->
-            ghi(t("Đã chép kịch bản khôi phục vào $p trên tivi.", "Copied the restore script to $p on the TV."))
-        }
+        // Hai file vào Download của tivi mỗi lần cài / dọn: kịch bản khôi phục và file cấu hình Home vừa áp dụng.
+        // Mỗi cái ghi riêng và báo rõ được hay không, không im lặng bỏ qua như trước.
+        runCatching { val chu = kichBan(); io { tv.ghiVaoDownload(tenFileKichBan, chu.toByteArray()) } }
+            .onSuccess { p -> ghi(t("Đã chép kịch bản khôi phục vào $p trên tivi.", "Copied the restore script to $p on the TV.")) }
+            .onFailure { e -> ghi(t("Không chép được kịch bản khôi phục vào Download của tivi (${e.message ?: e.javaClass.simpleName}). Bản sao lưu trong app vẫn còn.", "Couldn't copy the restore script to the TV's Download folder (${e.message ?: e.javaClass.simpleName}). The backup in the app is still there.")) }
+        runCatching { val du = taoFileCauHinh(); io { tv.ghiVaoDownload(tenFileCauHinh, du) } }
+            .onSuccess { p -> ghi(t("Đã lưu file cấu hình Home vào $p trên tivi.", "Saved the Home settings file to $p on the TV.")) }
+            .onFailure { e -> ghi(t("Không lưu được file cấu hình vào Download của tivi (${e.message ?: e.javaClass.simpleName}).", "Couldn't save the settings file to the TV's Download folder (${e.message ?: e.javaClass.simpleName}).")) }
     }
 
     fun xuatKichBanTv() = chay(t("Đang lưu kịch bản khôi phục…", "Saving the restore script…")) {
