@@ -601,7 +601,22 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         dangKiemTraCapNhat = true
         viewModelScope.launch {
             try {
-                val b = runCatching { io { com.txa.cleantxa.CapNhat.kiemTraApp() } }.getOrNull()
+                val kq = runCatching { io { com.txa.cleantxa.CapNhat.kiemTraApp() } }
+                val loiKiemTra = kq.exceptionOrNull()
+                val b = kq.getOrNull()
+                if (loiKiemTra != null) {
+                    // Kiểm tra thất bại không có nghĩa là đang ở bản mới nhất: báo rõ, kèm nguyên nhân dễ hiểu.
+                    com.txa.cleantxa.TxaLogger.w("CapNhat", "Manual update check failed", loiKiemTra)
+                    val gioiHan = loiKiemTra.message?.contains(Regex("HTTP (403|429)")) == true
+                    android.widget.Toast.makeText(
+                        ctx,
+                        if (gioiHan) t("GitHub tạm giới hạn số lần kiểm tra từ mạng của bạn. Thử lại sau vài phút hoặc đổi sang dữ liệu di động.",
+                            "GitHub is temporarily limiting checks from your network. Try again in a few minutes or switch to mobile data.")
+                        else t("Không kiểm tra được bản mới. Kiểm tra kết nối mạng rồi thử lại.", "Couldn't check for a new version. Check your connection and try again."),
+                        android.widget.Toast.LENGTH_LONG,
+                    ).show()
+                    return@launch
+                }
                 banMoi = b
                 if (b != null) {
                     com.txa.cleantxa.CapNhat.fileApkDaTai(ctx, b)?.let { cached ->
