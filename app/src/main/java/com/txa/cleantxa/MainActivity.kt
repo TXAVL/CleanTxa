@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         runCatching { java.security.Security.insertProviderAt(org.conscrypt.Conscrypt.newProvider(), 1) }
-        NgonNgu.nap(this)
+        NgonNgu.nap(this, chuyenLuaChonCu = true)
         ManHinh.doc(this)
         TxaLogger.init(this)
         CapNhat.donOtaCuNeuDoiBan(this)
