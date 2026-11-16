@@ -5,6 +5,7 @@ PRIVACY AND LOCAL-FIRST OPERATION
 • CleanTxa works locally over Wi-Fi ADB between your phone and your TV.
 • No account is needed. No usage data, no list of your apps and no information about your TV is sent to third-party servers.
 • The network is only used to: check for new versions of the app; download updates to the TV model data; fetch optional weather data; and, only when you open it, serve the log viewer (port 2311) inside your own Wi-Fi network.
+• The phone's location is only read when you tap "Use my current location" (after you grant the permission), to choose where the weather on the TV is for. The coordinates are rounded, are only written into the Home settings on your own TV and are not sent to CleanTxa servers.
 • If you turn on the optional ad-blocking DNS, your TV sends its DNS lookups to the AdGuard DNS service.
 
 OPEN-SOURCE COMPONENTS

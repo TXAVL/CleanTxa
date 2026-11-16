@@ -104,6 +104,47 @@ object XaPhuong {
         }
     }.getOrNull()
 
+    /** Tỉnh / thành phố (34 đơn vị sau sáp nhập 2025) kèm toạ độ, để chọn tỉnh trước rồi tới phường/xã. */
+    data class Tinh(val ten: String, val lat: Double, val lon: Double) {
+        /** Tên ngắn hiện trên tivi: bỏ chữ "Tỉnh" / "Thành phố". */
+        val tenNgan get() = ten.removePrefix("Tỉnh ").removePrefix("Thành phố ")
+        val khoaTim by lazy { boDau(ten) }
+    }
+    @Volatile private var dsTinh: List<Tinh>? = null
+    fun napTinh(ctx: android.content.Context): List<Tinh> = dsTinh ?: runCatching {
+        val o = org.json.JSONObject(ctx.assets.open("xa.json").bufferedReader().readText())
+        val t = o.getJSONArray("tinh")
+        (0 until t.length()).map { i -> t.getJSONArray(i).let { Tinh(it.getString(0), it.getDouble(1), it.getDouble(2)) } }
+    }.getOrDefault(emptyList()).also { dsTinh = it }
+
+    /** Lọc tỉnh theo chữ gõ không dấu; để trống thì trả cả danh sách. */
+    fun timTinh(ds: List<Tinh>, q: String): List<Tinh> {
+        val tu = boDau(q).split(' ').filter { it.isNotBlank() }
+        return if (tu.isEmpty()) ds else ds.filter { x -> tu.all { x.khoaTim.contains(it) } }
+    }
+
+    /** Phường/xã của một tỉnh, xếp theo tên (không dấu). */
+    fun xaCuaTinh(ds: List<Xa>, tinh: Tinh): List<Xa> = ds.filter { it.tinh == tinh.ten }.sortedBy { boDau(it.tenNgan) }
+
+    /** Lọc phường/xã trong một danh sách theo chữ gõ không dấu (chỉ xét tên phường/xã, không xét tên tỉnh). */
+    fun locXa(ds: List<Xa>, q: String): List<Xa> {
+        val tu = boDau(q).split(' ').filter { it.isNotBlank() }
+        return if (tu.isEmpty()) ds else ds.filter { x -> boDau(x.ten).let { k -> tu.all { k.contains(it) } } }
+    }
+
+    /** Khoảng cách theo đường chim bay (km) giữa hai toạ độ. */
+    fun khoangCachKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        return 2 * 6371.0 * Math.asin(Math.sqrt(a))
+    }
+
+    /** Phường/xã gần toạ độ nhất trong [kmToiDa] km; null nếu không có (vd. đang ở nước ngoài). */
+    fun gan(ds: List<Xa>, lat: Double, lon: Double, kmToiDa: Double = 30.0): Xa? =
+        ds.minByOrNull { khoangCachKm(lat, lon, it.lat, it.lon) }?.takeIf { khoangCachKm(lat, lon, it.lat, it.lon) <= kmToiDa }
+
     fun timXa(ds: List<Xa>, q: String, toiDa: Int = 8): List<Xa> {
         val tu = boDau(q).split(' ').filter { it.isNotBlank() }
         if (tu.isEmpty()) return emptyList()
