@@ -60,6 +60,13 @@ data class LauncherConfig(
     val kidsMode: Boolean = false,
     val kidsApps: Set<String> = emptySet(),
     val kidsPin: String = "",
+    /** Đồng hồ: ẩn thì ẩn luôn dòng ngày; hiện thì có thêm giây ([showClockSeconds]), ngày ([showDate]), 24 giờ ([clock24h]). */
+    val showClock: Boolean = true,
+    val showDate: Boolean = true,
+    val clock24h: Boolean = true,
+    /** Hai nút trên thanh trên cùng. */
+    val showWifiButton: Boolean = true,
+    val showSettingsButton: Boolean = true,
     val raw: JSONObject = JSONObject(),
 )
 
@@ -164,6 +171,11 @@ object ConfigStore {
             kidsMode = j.optBoolean("kids_mode", false),
             kidsApps = strList("kids_apps").toSet(),
             kidsPin = j.optString("kids_pin", ""),
+            showClock = j.optBoolean("show_clock", true),
+            showDate = j.optBoolean("show_date", true),
+            clock24h = j.optBoolean("clock_24h", true),
+            showWifiButton = j.optBoolean("show_wifi_button", true),
+            showSettingsButton = j.optBoolean("show_settings_button", true),
             raw = j,
         )
     }
