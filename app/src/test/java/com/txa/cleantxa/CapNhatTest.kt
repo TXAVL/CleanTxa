@@ -5,6 +5,28 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CapNhatTest {
+    private fun mau(vararg ids: String) = org.json.JSONObject().put(
+        "mau",
+        org.json.JSONArray(ids.map { org.json.JSONObject().put("id", it).put("goi", org.json.JSONArray()) }),
+    )
+
+    @Test
+    fun themMauChuaCo_chiThemMauMoiVaGiuNguyenMauCo() {
+        val dich = mau("a", "b")
+        val them = CapNhat.themMauChuaCo(dich, mau("b", "c", "d"))
+        assertEquals(2, them)
+        val ids = (0 until dich.getJSONArray("mau").length()).map { dich.getJSONArray("mau").getJSONObject(it).getString("id") }
+        assertEquals(listOf("a", "b", "c", "d"), ids)
+    }
+
+    @Test
+    fun themMauChuaCo_khongCoGiMoiThiTraKhong() {
+        val dich = mau("a", "b")
+        assertEquals(0, CapNhat.themMauChuaCo(dich, mau("a", "b")))
+        assertEquals(0, CapNhat.themMauChuaCo(dich, org.json.JSONObject()))
+        assertEquals(2, dich.getJSONArray("mau").length())
+    }
+
     @Test
     fun tachGhiChuSongNgu_tachDungViVaEn() {
         val body = """

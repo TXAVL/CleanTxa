@@ -51,8 +51,43 @@ object CapNhat {
     fun donOtaCuNeuDoiBan(ctx: Context) {
         val p = ctx.getSharedPreferences("ota", Context.MODE_PRIVATE)
         if (p.getInt("cho_ban", -1) == BuildConfig.VERSION_CODE) return
+        // Mẫu tivi đã gộp từ cleanyourtv không được mất theo: giữ những mẫu bản đóng sẵn chưa có, nếu không mỗi lần
+        // đổi bản app lại gộp lại đúng các mẫu cũ và ghi "Merged N new TV model(s)" như thể mới.
+        val giuDuLieu = runCatching { duLieuSauKhiDoiBan(ctx) }.getOrNull()
         File(ctx.filesDir, "ota").deleteRecursively()
+        if (giuDuLieu != null) {
+            runCatching {
+                fileDuLieu(ctx, "du-lieu.json").apply { parentFile?.mkdirs() }.writeText(giuDuLieu, Charsets.UTF_8)
+            }
+        }
         p.edit().clear().putInt("cho_ban", BuildConfig.VERSION_CODE).apply()
+    }
+
+    /** `du-lieu.json` mới = bản đóng sẵn + các mẫu đã tải mà bản đóng sẵn chưa có; null nếu không có gì để giữ. */
+    private fun duLieuSauKhiDoiBan(ctx: Context): String? {
+        val f = fileDuLieu(ctx, "du-lieu.json")
+        if (!f.isFile || f.length() == 0L) return null
+        val daTai = JSONObject(f.readText(Charsets.UTF_8))
+        val dongGoi = JSONObject(ctx.assets.open("du-lieu.json").bufferedReader(Charsets.UTF_8).use { it.readText() })
+        return if (themMauChuaCo(dongGoi, daTai) > 0) dongGoi.toString() else null
+    }
+
+    /** Thêm vào [dich] các mẫu của [nguon] có id chưa có trong [dich]; trả về số mẫu đã thêm. */
+    internal fun themMauChuaCo(dich: JSONObject, nguon: JSONObject): Int {
+        val mauDich = dich.getJSONArray("mau")
+        val daCo = HashSet<String>()
+        for (i in 0 until mauDich.length()) daCo.add(mauDich.getJSONObject(i).optString("id"))
+        val mauNguon = nguon.optJSONArray("mau") ?: return 0
+        var them = 0
+        for (i in 0 until mauNguon.length()) {
+            val m = mauNguon.getJSONObject(i)
+            val id = m.optString("id")
+            if (id.isNotBlank() && daCo.add(id)) {
+                mauDich.put(m)
+                them++
+            }
+        }
+        return them
     }
 
     fun moAsset(ctx: Context, ten: String): InputStream {
@@ -412,9 +447,10 @@ object CapNhat {
                         val note = trimmed.substringAfter('#', "").trim()
                         goiArr.put(
                             JSONObject()
-                                .put("pkg", pkg)
-                                .put("nhom", currentGroup)
-                                .put("ghiChu", note)
+                                // Khoá phải khớp DuLieu.docJson (p / g / n), thiếu "p" là "No value for p" lúc đọc tivi.
+                                .put("p", pkg)
+                                .put("g", currentGroup)
+                                .put("n", note)
                         )
                     }
                 }
@@ -434,6 +470,11 @@ object CapNhat {
                 addedModels.add("$ten (${goiArr.length()} pkg)")
                 added++
                 if (added >= 20) break
+            }
+            // Không lưu file mà chính app không đọc nổi: đọc thử trước khi thay.
+            if (added > 0 && runCatching { com.txa.cleantxa.dulieu.DuLieu.docJson(root.toString()) }.isFailure) {
+                TxaLogger.w("Sync", "Merged data failed validation, not saving $added model(s)")
+                added = 0
             }
             if (added > 0) {
                 val f = fileDuLieu(ctx, "du-lieu.json").apply { parentFile?.mkdirs() }

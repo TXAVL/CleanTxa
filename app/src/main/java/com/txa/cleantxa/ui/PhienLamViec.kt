@@ -734,8 +734,27 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
             t("Không tới được tivi. Điện thoại và tivi phải chung một mạng Wi-Fi.", "Cannot reach the TV. The phone and TV must be on the same Wi-Fi.")
         e is java.net.SocketTimeoutException || e.message?.contains("timed out") == true ->
             t("Hết thời gian chờ. Có thể tivi đang hiện hộp \"Cho phép gỡ lỗi?\", bấm Cho phép rồi thử lại.", "Timed out. The TV may be showing \"Allow debugging?\" — press Allow and try again.")
-        else -> listOfNotNull(e.message, e.cause?.message).firstOrNull()
-            ?: t("Lỗi kết nối (${e.javaClass.simpleName}). Kiểm tra IP, cổng và tivi còn bật.", "Connection error (${e.javaClass.simpleName}). Check the IP, port and that the TV is on.")
+        // Dữ liệu mẫu tivi hỏng (vd. "No value for p"): lỗi của app chứ không phải của tivi hay mạng.
+        e is org.json.JSONException ->
+            t("Tivi đã kết nối, nhưng app không đọc được dữ liệu mẫu tivi (file dữ liệu bị lỗi). Đây không phải lỗi của bạn hay của tivi. App đã bỏ file lỗi, hãy bấm Kết nối lại. Vẫn báo thì mở Nhật ký và gửi cho VGS.${chiTietLoi(e)}",
+                "The TV is connected, but the app couldn't read its TV model data (the data file is damaged). It isn't your fault or the TV's. The app dropped the bad file; press Connect again. If it still fails, open the Logs and send them to VGS.${chiTietLoi(e)}")
+        // libadb báo "Connection failed" khi tivi không trả lời / không cho phép / chặn ADB.
+        e.message?.contains("Connection failed") == true ->
+            t("Không kết nối được tới tivi. Kiểm tra: tivi đang bật, đã bật Gỡ lỗi USB / Gỡ lỗi qua mạng, điện thoại cùng Wi-Fi với tivi, IP và cổng đúng. Nếu tivi hiện hộp \"Cho phép gỡ lỗi USB?\" thì chọn Cho phép rồi thử lại.${chiTietLoi(e)}",
+                "Couldn't connect to the TV. Check that the TV is on, USB / Network debugging is enabled, the phone is on the same Wi-Fi, and the IP and port are right. If the TV shows \"Allow USB debugging?\", choose Allow and try again.${chiTietLoi(e)}")
+        e is java.io.FileNotFoundException || e is java.io.IOException && e.message?.contains("No space") == true ->
+            t("Điện thoại hoặc tivi không còn đủ chỗ trống hoặc không ghi được file. Giải phóng bộ nhớ rồi thử lại.${chiTietLoi(e)}",
+                "The phone or TV is out of space or a file couldn't be written. Free up some storage and try again.${chiTietLoi(e)}")
+        else ->
+            t("Có lỗi bất ngờ khi làm việc với tivi. Thử lại một lần; vẫn lỗi thì mở Nhật ký và gửi cho VGS kèm hãng, model tivi.${chiTietLoi(e)}",
+                "Something unexpected went wrong while working with the TV. Try once more; if it keeps happening, open the Logs and send them to VGS with the TV brand and model.${chiTietLoi(e)}")
+    }
+
+    /** Dòng chi tiết kỹ thuật ngắn đặt cuối thông báo lỗi, để người hỗ trợ còn đọc được nguyên nhân thật. */
+    private fun chiTietLoi(e: Throwable): String {
+        val goc = listOfNotNull(e.message, e.cause?.message).firstOrNull()?.lineSequence()?.firstOrNull()?.trim()?.take(120)
+            ?: e.javaClass.simpleName
+        return "\n(" + t("Chi tiết kỹ thuật", "Technical detail") + ": $goc)"
     }
 
     private suspend fun <T> io(khoi: () -> T): T = withContext(Dispatchers.IO) { khoi() }

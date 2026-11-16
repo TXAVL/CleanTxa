@@ -29,9 +29,22 @@ class DuLieu(val mau: List<MauTv>, val thongKe: Map<String, ThongKeGoi>) {
         @Volatile private var cache: DuLieu? = null
 
         fun nap(context: Context): DuLieu = cache ?: synchronized(this) {
-            cache ?: docJson(
-                com.txa.cleantxa.CapNhat.moAsset(context, "du-lieu.json").bufferedReader().readText()
-            ).also { cache = it }
+            cache ?: napTuOtaHoacDongGoi(context).also { cache = it }
+        }
+
+        /**
+         * Đọc file đã tải về (nếu có); hỏng thì bỏ file đó và dùng bản đóng sẵn trong app, để một file dữ liệu lỗi
+         * không chặn cả việc đọc thông tin tivi ("No value for p").
+         */
+        private fun napTuOtaHoacDongGoi(context: Context): DuLieu {
+            val daTai = com.txa.cleantxa.CapNhat.fileDuLieu(context, "du-lieu.json")
+            if (daTai.isFile && daTai.length() > 0) {
+                runCatching { return docJson(daTai.readText(Charsets.UTF_8)) }.onFailure {
+                    com.txa.cleantxa.TxaLogger.w("DuLieu", "Downloaded du-lieu.json is unreadable, using the bundled one", it)
+                    runCatching { daTai.delete() }
+                }
+            }
+            return docJson(context.assets.open("du-lieu.json").bufferedReader(Charsets.UTF_8).use { it.readText() })
         }
 
         fun lamMoiCache() {
@@ -48,9 +61,12 @@ class DuLieu(val mau: List<MauTv>, val thongKe: Map<String, ThongKeGoi>) {
                     id = m.getString("id"),
                     ten = m.getString("ten"),
                     header = m.getString("header"),
-                    goi = (0 until g.length()).map { j ->
+                    // Bản đồng bộ cũ (≤ 1.3.0) lưu nhầm khoá pkg / nhom / ghiChu: đọc luôn cả hai kiểu, bỏ dòng không có gói.
+                    goi = (0 until g.length()).mapNotNull { j ->
                         val o = g.getJSONObject(j)
-                        GoiMau(o.getString("p"), o.optString("g"), o.optString("n"))
+                        val pkg = o.optString("p").ifBlank { o.optString("pkg") }
+                        if (pkg.isBlank()) null
+                        else GoiMau(pkg, o.optString("g").ifBlank { o.optString("nhom") }, o.optString("n").ifBlank { o.optString("ghiChu") })
                     },
                     phim = m.optJSONObject("phim"),
                 )
