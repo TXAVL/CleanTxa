@@ -1,7 +1,9 @@
 package com.txa.cleantxa.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,12 +21,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -38,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -65,7 +70,40 @@ fun DebloatScreen(vm: PhienLamViec) {
     val grouped = remember(filtered) { filtered.groupBy { it.loai } }
 
     Column(Modifier.fillMaxSize()) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("$selectedCount", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            t("gói sẽ tắt / ${vm.muc.size}", "packages to disable / ${vm.muc.size}"),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 6.dp),
+                        )
+                    }
+                    LinearProgressIndicator(
+                        progress = { if (vm.muc.isEmpty()) 0f else selectedCount.toFloat() / vm.muc.size },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        t(
+                            "Đã tích sẵn gói an toàn. App có biểu tượng thì hỏi chủ nhà. Gói tivi cần (HDMI, remote, bàn phím, CH Play) app tự giữ, không hiện ở đây.",
+                            "Safe packages are pre-ticked. For apps with an icon, ask the household. Packages the TV needs (HDMI, remote, keyboard, Play Store) are kept automatically and not listed here.",
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { vm.muc.forEach { vm.chon[it.pkg] = it.chonSan } }) {
+                            Text(t("Mặc định", "Defaults"))
+                        }
+                        TextButton(onClick = { vm.muc.forEach { vm.chon[it.pkg] = false } }) {
+                            Text(t("Bỏ chọn hết", "Clear all"))
+                        }
+                    }
+                }
+            }
             OutlinedTextField(
                 value = search,
                 onValueChange = { search = it },
@@ -74,25 +112,6 @@ fun DebloatScreen(vm: PhienLamViec) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    t("Đã chọn $selectedCount / ${vm.muc.size} gói", "Selected $selectedCount / ${vm.muc.size}"),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { vm.muc.forEach { vm.chon[it.pkg] = it.chonSan } }) {
-                        Text(t("Mặc định", "Defaults"))
-                    }
-                    TextButton(onClick = { vm.muc.forEach { vm.chon[it.pkg] = false } }) {
-                        Text(t("Bỏ chọn hết", "Clear all"))
-                    }
-                }
-            }
         }
 
         LazyColumn(
@@ -102,14 +121,14 @@ fun DebloatScreen(vm: PhienLamViec) {
             LoaiMuc.entries.forEach { loai ->
                 val list = grouped[loai] ?: return@forEach
                 item(key = "hdr_${loai.name}") {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(loai.tieuDe, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    val tatCa = list.all { vm.chon[it.pkg] == true }
+                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.Top) {
+                        Column(Modifier.weight(1f)) {
+                            Text(loai.tieuDe, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Text(loai.moTa, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        TextButton(onClick = { list.forEach { vm.chon[it.pkg] = !tatCa } }) {
+                            Text(if (tatCa) t("Bỏ hết", "Clear") else t("Chọn hết", "Select all"), fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -130,7 +149,6 @@ fun DebloatScreen(vm: PhienLamViec) {
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                CommandPreviewButton { vm.lenhDon() }
                 Button(
                     onClick = {
                         val risky = vm.muc.filter { vm.chon[it.pkg] == true && KeHoach.nenGiu(it) }
@@ -143,10 +161,18 @@ fun DebloatScreen(vm: PhienLamViec) {
                     Icon(Icons.Default.CleaningServices, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        if (selectedCount > 0) t("Tắt $selectedCount gói đã chọn", "Disable $selectedCount selected")
-                        else t("Không tắt gói nào — Sang Home sạch", "Skip disabling — Go to Clean Home")
+                        if (selectedCount > 0) t("Sao lưu & dọn $selectedCount gói", "Back up & clean $selectedCount packages")
+                        else t("Không tắt gói nào, sang Home sạch", "Skip disabling, go to the clean Home")
                     )
                 }
+                if (selectedCount > 0) {
+                    OutlinedButton(onClick = { vm.boQuaDon() }, enabled = !vm.dangBan, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Home, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(t("Bỏ qua, chỉ đổi giao diện", "Skip, only change the look"))
+                    }
+                }
+                CommandPreviewButton { vm.lenhDon() }
             }
         }
     }
@@ -191,36 +217,58 @@ fun DebloatScreen(vm: PhienLamViec) {
 private fun PackageRow(m: MucGoi, checked: Boolean, onToggle: (Boolean) -> Unit) {
     val keepWarn = KeHoach.nenGiu(m)
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (checked) 0.85f else 0.45f),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onToggle(!checked) },
     ) {
         Row(
-            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            Modifier.padding(14.dp),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Checkbox(checked = checked, onCheckedChange = onToggle)
-            Column(Modifier.weight(1f)) {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surface),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(tenDep(m.pkg).take(1).uppercase(), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(tenDep(m.pkg), fontWeight = FontWeight.SemiBold)
                 Text(m.pkg, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (m.ghiChu.isNotBlank()) {
-                    Spacer(Modifier.height(2.dp))
                     Text(m.ghiChu, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
                 }
                 if (m.soMauTat > 0 || m.soMauGiu > 0) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        t("${m.soMauTat} mẫu tắt · ${m.soMauGiu} mẫu giữ", "${m.soMauTat} disabled · ${m.soMauGiu} kept") +
-                            (if (keepWarn) t(" (Nên giữ)", " (Recommended to keep)") else ""),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (keepWarn) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (m.soMauTat > 0) NhanChip(t("tắt trên ${m.soMauTat} mẫu", "off on ${m.soMauTat} models"), canhBao = false)
+                        if (m.soMauGiu > 0) {
+                            NhanChip((if (keepWarn) "⚠ " else "") + t("${m.soMauGiu} mẫu nên giữ", "${m.soMauGiu} models keep it"), canhBao = keepWarn)
+                        }
+                    }
                 }
             }
+            Checkbox(checked = checked, onCheckedChange = onToggle)
         }
+    }
+}
+
+@Composable
+private fun NhanChip(chu: String, canhBao: Boolean) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = if (canhBao) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surface,
+    ) {
+        Text(
+            chu,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (canhBao) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

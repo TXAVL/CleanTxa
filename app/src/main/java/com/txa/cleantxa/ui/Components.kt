@@ -120,7 +120,7 @@ fun CleanTxaApp(vm: PhienLamViec) {
                 .padding(padding)
         ) {
             stepIndex(vm.man)?.let { step ->
-                StepProgressBar(currentStep = step)
+                StepProgressBar(currentStep = step, tenTv = vm.thongTin?.tenHienThi?.takeIf { step >= 2 })
             }
             StatusBanner(vm)
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -462,10 +462,10 @@ fun navigateBack(vm: PhienLamViec) {
 
 private fun stepIndex(m: Man): Int? = when (m) {
     Man.KET_NOI -> 1
-    Man.THONG_TIN -> 2
-    Man.CHON_GOI, Man.DANG_TAT -> 3
-    Man.HOME_SACH -> 4
-    Man.XONG -> 5
+    Man.THONG_TIN, Man.CHON_GOI -> 2   // "Chọn": màn thông tin tivi và danh sách gói
+    Man.DANG_TAT -> 3                  // "Dọn"
+    Man.HOME_SACH -> 4                 // "Home"
+    Man.XONG -> 5                      // xong: cả bốn bước đã đi hết
     else -> null
 }
 
@@ -548,14 +548,26 @@ private fun CleanTxaTopBar(vm: PhienLamViec) {
 }
 
 @Composable
-private fun StepProgressBar(currentStep: Int) {
+private fun StepProgressBar(currentStep: Int, tenTv: String? = null) {
     val labels = listOf(
         t("Kết nối", "Connect"),
-        t("Tivi", "TV"),
+        t("Chọn", "Choose"),
         t("Dọn", "Clean"),
         t("Home", "Home"),
-        t("Xong", "Done"),
     )
+    if (!tenTv.isNullOrBlank()) {
+        Text(
+            tenTv,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
     Row(
         Modifier
             .fillMaxWidth()
@@ -575,8 +587,7 @@ private fun StepProgressBar(currentStep: Int) {
                         .clip(CircleShape)
                         .background(
                             when {
-                                active -> MaterialTheme.colorScheme.primary
-                                done -> MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                active || done -> MaterialTheme.colorScheme.primary
                                 else -> MaterialTheme.colorScheme.surfaceVariant
                             }
                         )
@@ -585,7 +596,8 @@ private fun StepProgressBar(currentStep: Int) {
                 Text(
                     label,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                    color = if (active) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                 )
             }
@@ -635,6 +647,7 @@ fun StatusBanner(vm: PhienLamViec) {
                     if (vm.canDonBoNho) {
                         Spacer(Modifier.height(8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Thanh lỗi "hết bộ nhớ" xuất hiện khi cài Home sạch hỏng: chỉ dọn cache, bạn tự bấm cài lại.
                             Button(onClick = { vm.donBoNhoDem() }) {
                                 Icon(Icons.Default.CleaningServices, null, Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))

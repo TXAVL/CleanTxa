@@ -439,8 +439,8 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
             try {
                 val ds = io { tv.doMayChieu() }
                 mayChieu = ds
-                if (ds.isEmpty()) loi = t("Không thấy màn lấy nét / chỉnh hình nào của hãng. Bấm Gửi danh sách để VGS xem giúp.",
-                    "No focus / keystone screens found. Tap Send list so VGS can take a look.")
+                if (ds.isEmpty()) loi = t("Không thấy màn lấy nét / chỉnh hình nào của hãng. Mở Nhật ký (Logs) và gửi cho nhà phát triển xem giúp.",
+                    "No focus / keystone screens found. Open the Logs and send them to the developer to take a look.")
             } catch (e: Throwable) { loi = moTaLoi(e) } finally { dangDoMayChieu = false }
         }
     }
@@ -730,8 +730,8 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
 
     private fun moTaLoi(e: Throwable): String = when {
         e is ThaoTacTv.TiviKhoiDongLaiException ->
-            t("Tivi vừa tự khởi động lại ngay sau khi tắt ${e.goi}. App đã dừng dọn để an toàn (${e.daTat} gói đã tắt, đều có trong sao lưu). Chờ tivi lên lại, kết nối lại: tivi chạy bình thường thì dọn tiếp và bỏ tích ${e.goi}; có gì lạ thì bấm Khôi phục tivi này. Gửi góp ý kèm model tivi để VGS ghi gói này vào danh sách giữ.",
-                "The TV restarted right after ${e.goi} was disabled. The app stopped cleaning to be safe (${e.daTat} packages disabled, all in the backup). Wait for the TV, reconnect: if it works, clean again without ${e.goi}; if anything is wrong, press Restore this TV. Send feedback with the TV model so VGS can keep this package.")
+            t("Tivi vừa tự khởi động lại ngay sau khi tắt ${e.goi}. App đã dừng dọn để an toàn (${e.daTat} gói đã tắt, đều có trong sao lưu). Chờ tivi lên lại, kết nối lại: tivi chạy bình thường thì dọn tiếp và bỏ tích ${e.goi}; có gì lạ thì bấm Khôi phục tivi này. Gửi góp ý kèm model tivi cho nhà phát triển để ghi gói này vào danh sách giữ.",
+                "The TV restarted right after ${e.goi} was disabled. The app stopped cleaning to be safe (${e.daTat} packages disabled, all in the backup). Wait for the TV, reconnect: if it works, clean again without ${e.goi}; if anything is wrong, press Restore this TV. Send feedback with the TV model so the developer can keep this package.")
         e is ThaoTacTv.MatKetNoiTvException ->
             t("Mất kết nối với tivi giữa lúc dọn và không nối lại được (${e.daTat} gói đã tắt, đều có trong sao lưu). Kiểm tra tivi còn bật và cùng Wi-Fi, rồi kết nối lại để dọn tiếp hoặc bấm Khôi phục tivi này. Không nối được: tắt tivi ở công tắc nguồn 10 giây rồi bật lại.",
                 "Lost the connection to the TV while cleaning and couldn't reconnect (${e.daTat} packages disabled, all in the backup). Check the TV is on and on the same Wi-Fi, then reconnect to continue or press Restore this TV. Still nothing: switch the TV off at the wall for 10 seconds.")
@@ -749,10 +749,12 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
             t("Không tới được tivi. Điện thoại và tivi phải chung một mạng Wi-Fi.", "Cannot reach the TV. The phone and TV must be on the same Wi-Fi.")
         e is java.net.SocketTimeoutException || e.message?.contains("timed out") == true ->
             t("Hết thời gian chờ. Có thể tivi đang hiện hộp \"Cho phép gỡ lỗi?\", bấm Cho phép rồi thử lại.", "Timed out. The TV may be showing \"Allow debugging?\" — press Allow and try again.")
+        // Dòng thô của Android như "cmd: Can't find service: package": tivi đang khởi động / dịch vụ gói chưa chạy.
+        ThaoTacTv.laLoiDichVuGoi(listOfNotNull(e.message, e.cause?.message).joinToString(" ")) -> tv.baoGoiChuaChay()
         // Dữ liệu mẫu tivi hỏng (vd. "No value for p"): lỗi của app chứ không phải của tivi hay mạng.
         e is org.json.JSONException ->
-            t("Tivi đã kết nối, nhưng app không đọc được dữ liệu mẫu tivi (file dữ liệu bị lỗi). Đây không phải lỗi của bạn hay của tivi. App đã bỏ file lỗi, hãy bấm Kết nối lại. Vẫn báo thì mở Nhật ký và gửi cho VGS.${chiTietLoi(e)}",
-                "The TV is connected, but the app couldn't read its TV model data (the data file is damaged). It isn't your fault or the TV's. The app dropped the bad file; press Connect again. If it still fails, open the Logs and send them to VGS.${chiTietLoi(e)}")
+            t("Tivi đã kết nối, nhưng app không đọc được dữ liệu mẫu tivi (file dữ liệu bị lỗi). Đây không phải lỗi của bạn hay của tivi. App đã bỏ file lỗi, hãy bấm Kết nối lại. Vẫn báo thì mở Nhật ký và gửi cho nhà phát triển.${chiTietLoi(e)}",
+                "The TV is connected, but the app couldn't read its TV model data (the data file is damaged). It isn't your fault or the TV's. The app dropped the bad file; press Connect again. If it still fails, open the Logs and send them to the developer.${chiTietLoi(e)}")
         // libadb báo "Connection failed" khi tivi không trả lời / không cho phép / chặn ADB.
         e.message?.contains("Connection failed") == true ->
             t("Không kết nối được tới tivi. Kiểm tra: tivi đang bật, đã bật Gỡ lỗi USB / Gỡ lỗi qua mạng, điện thoại cùng Wi-Fi với tivi, IP và cổng đúng. Nếu tivi hiện hộp \"Cho phép gỡ lỗi USB?\" thì chọn Cho phép rồi thử lại.${chiTietLoi(e)}",
@@ -761,8 +763,8 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
             t("Điện thoại hoặc tivi không còn đủ chỗ trống hoặc không ghi được file. Giải phóng bộ nhớ rồi thử lại.${chiTietLoi(e)}",
                 "The phone or TV is out of space or a file couldn't be written. Free up some storage and try again.${chiTietLoi(e)}")
         else ->
-            t("Có lỗi bất ngờ khi làm việc với tivi. Thử lại một lần; vẫn lỗi thì mở Nhật ký và gửi cho VGS kèm hãng, model tivi.${chiTietLoi(e)}",
-                "Something unexpected went wrong while working with the TV. Try once more; if it keeps happening, open the Logs and send them to VGS with the TV brand and model.${chiTietLoi(e)}")
+            t("Có lỗi bất ngờ khi làm việc với tivi. Thử lại một lần; vẫn lỗi thì mở Nhật ký và gửi cho nhà phát triển kèm hãng, model tivi.${chiTietLoi(e)}",
+                "Something unexpected went wrong while working with the TV. Try once more; if it keeps happening, open the Logs and send them to the developer with the TV brand and model.${chiTietLoi(e)}")
     }
 
     /** Dòng chi tiết kỹ thuật ngắn đặt cuối thông báo lỗi, để người hỗ trợ còn đọc được nguyên nhân thật. */
@@ -1379,21 +1381,27 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
 
     fun caiHomeSach() = chay(t("Đang cài Home sạch…", "Installing the clean Home…")) { caiHomeSachBen() }
 
-    /** Xoá cache các app trên tivi khi cài Home sạch hỏng vì hết bộ nhớ, đủ chỗ thì cài lại luôn. */
+    /**
+     * Xoá cache các app trên tivi, rồi báo kết quả. KHÔNG tự cài hay áp dụng Home sạch: Home sạch có màn riêng để chọn
+     * giao diện rồi tự bấm cài (giống CleanTV). Đang ở màn Home sạch (vừa cài hỏng vì hết bộ nhớ) thì báo đủ chỗ chưa và
+     * nhắc bấm nút cài.
+     */
     fun donBoNhoDem() = chay(t("Đang dọn bộ nhớ đệm trên tivi…", "Clearing caches on the TV…")) {
         val truoc = boNho?.first ?: io { tv.boNhoTrong() }?.first
         val sau = io { tv.donBoNhoDem() }
         boNho = sau
         val trong = sau?.first
+        val duoc = if (truoc != null && trong != null && trong > truoc) t(" (lấy lại ${ThaoTacTv.mb(trong - truoc)})", " (freed ${ThaoTacTv.mb(trong - truoc)})") else ""
+        val trenManHome = man == Man.HOME_SACH
         val can = sau?.let { ThaoTacTv.canTrong(it.second) }
-        if (trong != null && can != null && trong < can) {
+        if (trenManHome && trong != null && can != null && trong < can) {
             canDonBoNho = false
             error(t("Dọn xong vẫn chỉ còn ${ThaoTacTv.mb(trong)} trống, chưa đủ ${ThaoTacTv.mb(can)} để cài Home sạch. Vào Cài đặt > Ứng dụng trên tivi, gỡ bớt app không dùng rồi thử lại.",
                 "Still only ${ThaoTacTv.mb(trong)} free after clearing, short of the ${ThaoTacTv.mb(can)} the clean Home needs. Uninstall unused apps in the TV's Settings > Apps, then try again."))
         }
-        val duoc = if (truoc != null && trong != null && trong > truoc) t(" (lấy lại ${ThaoTacTv.mb(trong - truoc)})", " (freed ${ThaoTacTv.mb(trong - truoc)})") else ""
-        thongBao = t("Đã dọn bộ nhớ đệm$duoc. Đang cài Home sạch…", "Caches cleared$duoc. Installing the clean Home…")
-        if (daCoHomeSach) apDungThemeBen() else caiHomeSachBen()
+        val con = trong?.let { t(" Còn trống ${ThaoTacTv.mb(it)}.", " ${ThaoTacTv.mb(it)} free now.") } ?: ""
+        val goiY = if (trenManHome) t(" Giờ bạn có thể bấm nút cài Home sạch ở cuối màn.", " You can now press the install button at the bottom of the screen.") else ""
+        android.widget.Toast.makeText(ctx, t("Đã dọn bộ nhớ đệm$duoc.$con$goiY", "Caches cleared$duoc.$con$goiY"), android.widget.Toast.LENGTH_LONG).show()
     }
 
     fun datTiLeHieuUng(scale: String) = chay(t("Đang chỉnh tốc độ hiệu ứng TV (${scale}x)…", "Setting TV animation scale (${scale}x)…")) {
@@ -1468,11 +1476,11 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
                 t("Nút Home trên tivi vẫn mở Home Google ($goi). Trên Google TV phải tắt cả setupwraith thì mới thay được Home, mà mạng Wi-Fi lưu lúc cài tivi thuộc về nó nên app không tự tắt (tắt là rớt Wi-Fi). Tivi vẫn dùng bình thường như cũ. Muốn thay hẳn: trên tivi vào Cài đặt > Mạng, quên mạng Wi-Fi rồi kết nối lại (hoặc cắm dây LAN), sau đó kết nối lại app, ở bước chọn gói tích thêm setupwraith (nhóm Google Home) rồi dọn lại.",
                     "The TV's Home button still opens Google's Home ($goi). On Google TV setupwraith must be disabled too before Home can change, and the Wi-Fi saved during setup belongs to it, so the app leaves it (disabling it would drop the Wi-Fi). The TV works as before. To take over Home fully: on the TV, Settings > Network, forget the Wi-Fi and join it again (or plug in Ethernet), reconnect the app, tick setupwraith (Google Home group) in the package list and clean again.")
             else if (kq.lyDo == "khong-tat")
-                t("Tivi không cho tắt Home gốc ($goi): tắt xong nó tự bật lại, và cách mở đè Home sạch cũng không ăn. App đã để tivi như cũ. Home sạch vẫn mở được từ danh sách ứng dụng. Gửi góp ý kèm hãng, model (nút \"Gửi danh sách\" ở màn Xong) để VGS thêm hỗ trợ.",
-                    "The TV won't keep the stock Home ($goi) disabled: it turns itself back on, and opening the clean Home over it didn't work either. The app left the TV as it was. Open the clean Home from the app list, and send feedback with the brand and model (the \"Send list\" button on the Done screen) so VGS can add support.")
+                t("Tivi không cho tắt Home gốc ($goi): tắt xong nó tự bật lại, và cách mở đè Home sạch cũng không ăn. App đã để tivi như cũ. Home sạch vẫn mở được từ danh sách ứng dụng. Gửi góp ý kèm hãng, model cho nhà phát triển để thêm hỗ trợ.",
+                    "The TV won't keep the stock Home ($goi) disabled: it turns itself back on, and opening the clean Home over it didn't work either. The app left the TV as it was. Open the clean Home from the app list, and send feedback with the brand and model to the developer so they can add support.")
             else
-                t("Nút Home trên tivi vẫn mở '$goi' thay vì Home sạch. App đã để tivi như cũ, không tắt thêm gì. Gửi góp ý kèm hãng, model để VGS thêm hỗ trợ.",
-                    "The TV's Home button still opens '$goi' instead of the clean Home. The app left the TV as it was. Send feedback with the brand and model so VGS can add support.")
+                t("Nút Home trên tivi vẫn mở '$goi' thay vì Home sạch. App đã để tivi như cũ, không tắt thêm gì. Gửi góp ý kèm hãng, model cho nhà phát triển để thêm hỗ trợ.",
+                    "The TV's Home button still opens '$goi' instead of the clean Home. The app left the TV as it was. Send feedback with the brand and model so the developer can add support.")
         }
     }
 
