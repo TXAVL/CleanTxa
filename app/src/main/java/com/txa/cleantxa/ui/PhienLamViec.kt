@@ -766,6 +766,9 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
             t("Hết thời gian chờ. Có thể tivi đang hiện hộp \"Cho phép gỡ lỗi?\", bấm Cho phép rồi thử lại.", "Timed out. The TV may be showing \"Allow debugging?\" — press Allow and try again.")
         // Dòng thô của Android như "cmd: Can't find service: package": tivi đang khởi động / dịch vụ gói chưa chạy.
         ThaoTacTv.laLoiDichVuGoi(listOfNotNull(e.message, e.cause?.message).joinToString(" ")) -> tv.baoGoiChuaChay()
+        // Câu báo lỗi do chính app viết (error("…") và require của app, như "Mã PIN phải đúng 4 chữ số."): hiện nguyên văn,
+        // không gói thành "lỗi bất ngờ". Chỉ khớp đúng IllegalStateException trơn để lỗi lạ của thư viện vẫn đi đường chung.
+        e.javaClass == IllegalStateException::class.java && !e.message.isNullOrBlank() -> e.message!!
         // Dữ liệu mẫu tivi hỏng (vd. "No value for p"): lỗi của app chứ không phải của tivi hay mạng.
         e is org.json.JSONException ->
             t("Tivi đã kết nối, nhưng app không đọc được dữ liệu mẫu tivi (file dữ liệu bị lỗi). Đây không phải lỗi của bạn hay của tivi. App đã bỏ file lỗi, hãy bấm Kết nối lại. Vẫn báo thì mở Nhật ký và gửi cho nhà phát triển.${chiTietLoi(e)}",
@@ -1103,7 +1106,8 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         val coPin = khoaTrenTv?.optBoolean("coPin") == true
         if (!coPin || khoaPin.isNotEmpty()) {
             if (!Regex("^[0-9]{4}$").matches(khoaPin)) error(t("Mã PIN phải đúng 4 chữ số.", "The PIN must be exactly 4 digits."))
-            if (khoaPin != khoaPin2) error(t("Hai lần nhập PIN không giống nhau.", "The two PINs don't match."))
+            // Màn khoá trẻ em chỉ có một ô nhập PIN (khoaPin2 không gắn vào ô nào): chỉ so khi có ô nhập lại.
+            if (khoaPin2.isNotEmpty() && khoaPin != khoaPin2) error(t("Hai lần nhập PIN không giống nhau.", "The two PINs don't match."))
         }
         if (khoaKhung.isEmpty() && khoaApps.isEmpty()) error(t("Thêm một khung giờ khoá hoặc chọn app cần khoá.", "Add a lock period or pick apps to lock."))
         val gio = Regex("^([01][0-9]|2[0-3]):[0-5][0-9]$")
@@ -1632,7 +1636,7 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         cauHinhBao = t("Đã lưu file cấu hình.", "Settings file saved.")
     }
 
-    val tenFileCauHinh get() = "cleantv-" + (thongTin?.model ?: "tivi").replace(Regex("[^A-Za-z0-9]+"), "-") + ".json"
+    val tenFileCauHinh get() = com.txa.cleantxa.dulieu.TenFile.cauHinh(thongTin?.model)
 
     private fun taoFileCauHinh(): ByteArray {
         val j = JSONObject(cauHinhHome())
@@ -1693,7 +1697,7 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         return com.txa.cleantxa.dulieu.KichBanKhoiPhuc.tao(sl, com.txa.cleantxa.NgonNgu.tiengViet, ipLan)
     }
 
-    val tenFileKichBan get() = "cleantv-khoi-phuc-" + (saoLuu?.ten ?: "tivi").lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').take(30) + ".bat"
+    val tenFileKichBan get() = com.txa.cleantxa.dulieu.TenFile.kichBanKhoiPhuc(saoLuu?.ten)
 
     // ---------- File ngay trên tivi (CleanTxa chạy trên tivi, 29/10/2026) ----------
     // Android TV thường không có trình chọn file (hộp Lưu / Mở báo "không hỗ trợ" hay không có gì): lưu thẳng vào

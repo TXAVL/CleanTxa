@@ -1,8 +1,11 @@
 package com.txa.cleantxa.ui
 
+import android.graphics.BitmapFactory
 import android.net.Uri
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,6 +17,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -66,6 +70,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -220,10 +227,11 @@ private fun ChonKieuHome(vm: PhienLamViec) {
 private fun ThemesTab(vm: PhienLamViec) {
     ChonKieuHome(vm)
 
-    val pickWallpaper = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+    // Trình chọn ảnh của hệ thống (thư viện ảnh, Google Ảnh…), không phải trình chọn file. Máy cũ tự lùi về hộp chọn ảnh thường.
+    val pickWallpaper = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
         if (uri != null) vm.chonAnhNen(uri)
     }
-    val pickRotating = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+    val pickRotating = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
         if (uris.isNotEmpty()) vm.themAnhXoay(uris)
     }
 
@@ -280,8 +288,36 @@ private fun ThemesTab(vm: PhienLamViec) {
         icon = Icons.Default.Image,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val anhChinh = anhXemTruoc(vm.anhNenRieng, 4)
+            if (anhChinh != null) {
+                Image(
+                    bitmap = anhChinh,
+                    contentDescription = t("Ảnh nền đã chọn", "Chosen wallpaper"),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(14.dp)),
+                )
+                if (vm.anhXoay.isNotEmpty()) {
+                    Text(
+                        t("Ảnh tự đổi: ${vm.anhXoay.size + 1} ảnh", "Rotating photos: ${vm.anhXoay.size + 1}"),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        vm.anhXoay.forEach { b ->
+                            anhXemTruoc(b, 8)?.let {
+                                Image(
+                                    bitmap = it,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.size(width = 64.dp, height = 36.dp).clip(RoundedCornerShape(8.dp)),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = { pickWallpaper.launch(arrayOf("image/*")) }, modifier = Modifier.weight(1f)) {
+                OutlinedButton(onClick = { pickWallpaper.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, modifier = Modifier.weight(1f)) {
                     Text(t("Chọn từ điện thoại", "From phone"))
                 }
                 OutlinedButton(onClick = { vm.moAnhTrenTv() }, modifier = Modifier.weight(1f)) {
@@ -289,7 +325,7 @@ private fun ThemesTab(vm: PhienLamViec) {
                 }
             }
             OutlinedButton(
-                onClick = { pickRotating.launch(arrayOf("image/*")) },
+                onClick = { pickRotating.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Default.Add, null, Modifier.size(16.dp))
@@ -554,6 +590,7 @@ private fun XemTruoc(vm: PhienLamViec) {
     val th = vm.themeChon
     val mau = th.mau.map { Color(it) }.let { if (it.size >= 2) it else it + it }
     val gio = remember { java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")) }
+    val anh = anhXemTruoc(vm.anhNenRieng, 4)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(
             Modifier
@@ -562,6 +599,16 @@ private fun XemTruoc(vm: PhienLamViec) {
                 .clip(RoundedCornerShape(20.dp))
                 .background(Brush.linearGradient(mau)),
         ) {
+            if (anh != null) {
+                // Đã chọn ảnh riêng: ảnh thay nền giao diện, phủ lớp tối đúng bằng mức "Làm tối hình nền".
+                Image(
+                    bitmap = anh,
+                    contentDescription = null,
+                    contentScale = if (vm.anhVuaKhung) ContentScale.Fit else ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = (vm.lamToiNen / 100f).coerceIn(0f, 0.8f))))
+            }
             Column(Modifier.padding(18.dp)) {
                 Text(gio, color = Color.White, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Light)
                 if (vm.amLich) Text(t("âm lịch", "lunar date"), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelMedium)
@@ -641,5 +688,15 @@ private fun LauncherCard(vm: PhienLamViec) {
                 color = MaterialTheme.colorScheme.error,
             )
         }
+    }
+}
+
+/** Giải mã ảnh nền đã chuẩn bị (JPEG 1080p) thành ảnh nhỏ để xem trước; [thu] = hệ số thu nhỏ (4 = 1/4 mỗi chiều). */
+@Composable
+private fun anhXemTruoc(bytes: ByteArray?, thu: Int): ImageBitmap? = remember(bytes) {
+    bytes?.let {
+        runCatching {
+            BitmapFactory.decodeByteArray(it, 0, it.size, BitmapFactory.Options().apply { inSampleSize = thu })?.asImageBitmap()
+        }.getOrNull()
     }
 }

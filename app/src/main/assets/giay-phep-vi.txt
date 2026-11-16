@@ -5,6 +5,7 @@ QUYỀN RIÊNG TƯ VÀ HOẠT ĐỘNG CỤC BỘ
 • CleanTxa hoạt động cục bộ qua Wi-Fi ADB giữa điện thoại và tivi của bạn.
 • Không cần tài khoản. Không có dữ liệu sử dụng, danh sách ứng dụng của bạn hay thông tin về tivi nào được gửi lên máy chủ của bên thứ ba.
 • Kết nối mạng chỉ dùng để: kiểm tra phiên bản mới của app; tải bản cập nhật dữ liệu mẫu tivi; lấy dữ liệu thời tiết (tuỳ chọn); và, chỉ khi bạn mở, chạy trình xem nhật ký (cổng 2311) trong mạng Wi-Fi nhà bạn.
+• Vị trí của điện thoại chỉ được lấy khi bạn bấm "Dùng vị trí hiện tại" (sau khi bạn cấp quyền), để chọn nơi hiện thời tiết trên tivi. Toạ độ được làm tròn, chỉ ghi vào cấu hình Home trên tivi của bạn và không gửi lên máy chủ của CleanTxa.
 • Nếu bạn bật DNS chặn quảng cáo (tuỳ chọn), tivi sẽ gửi các truy vấn DNS của nó tới dịch vụ AdGuard DNS.
 
 THÀNH PHẦN MÃ NGUỒN MỞ

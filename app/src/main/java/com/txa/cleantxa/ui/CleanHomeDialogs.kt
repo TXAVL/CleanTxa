@@ -1,5 +1,9 @@
 package com.txa.cleantxa.ui
 
+import android.Manifest
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,8 +12,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material3.Icon
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -34,6 +43,7 @@ import com.txa.cleantxa.NgonNgu
 import com.txa.cleantxa.dulieu.NangCao
 import com.txa.cleantxa.dulieu.THANH_PHO
 import com.txa.cleantxa.dulieu.ThanhPho
+import com.txa.cleantxa.dulieu.ViTriHienTai
 import com.txa.cleantxa.dulieu.XaPhuong
 import com.txa.cleantxa.t
 import kotlinx.coroutines.Dispatchers
@@ -86,93 +96,196 @@ fun CleanHomeDialogs(
     }
 }
 
+/**
+ * Chọn nơi hiện thời tiết trên Home, hai bước: chọn tỉnh / thành phố trước, rồi phường / xã của tỉnh đó. Không muốn chọn
+ * phường / xã thì chọn dòng cuối danh sách (tên tỉnh / thành phố). Hoặc bấm nút lấy vị trí hiện tại của điện thoại.
+ * Vẫn gõ tìm thẳng phường / xã hoặc thành phố nước ngoài được ở bước đầu.
+ */
 @Composable
 private fun WeatherLocationDialog(vm: PhienLamViec, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
     var wards by remember { mutableStateOf<List<XaPhuong.Xa>>(emptyList()) }
+    var provinces by remember { mutableStateOf<List<XaPhuong.Tinh>>(emptyList()) }
+    var tinhChon by remember { mutableStateOf<XaPhuong.Tinh?>(null) }
     var worldResults by remember { mutableStateOf<List<XaPhuong.Xa>?>(null) }
+    var baoViTri by remember { mutableStateOf("") }
+    var dangLayViTri by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        wards = withContext(Dispatchers.IO) { XaPhuong.nap(ctx) }
+        val (tinh, xa) = withContext(Dispatchers.IO) { XaPhuong.napTinh(ctx) to XaPhuong.nap(ctx) }
+        provinces = tinh
+        wards = xa
     }
 
-    val matchedWards = remember(query, wards) {
-        if (query.isBlank()) emptyList() else XaPhuong.timXa(wards, query, 10)
+    fun chon(tp: ThanhPho) {
+        vm.thanhPho = tp
+        onDismiss()
+    }
+
+    fun dungViTri() {
+        dangLayViTri = true
+        baoViTri = ""
+        scope.launch {
+            val vt = ViTriHienTai.lay(ctx)
+            if (vt == null) {
+                dangLayViTri = false
+                baoViTri = t(
+                    "Không lấy được vị trí. Bật định vị (GPS) trên điện thoại rồi thử lại, hoặc chọn tỉnh / thành bên dưới.",
+                    "Couldn't get your location. Turn on location (GPS) on the phone and try again, or pick a province / city below.",
+                )
+                return@launch
+            }
+            val ten = ViTriHienTai.tenGoiY(ctx, vt.latitude, vt.longitude, wards, NgonNgu.tiengViet)
+            dangLayViTri = false
+            // Làm tròn 3 chữ số thập phân (khoảng 100 m): đủ cho thời tiết, không lưu vị trí chính xác hơn mức cần.
+            val lat = Math.round(vt.latitude * 1000) / 1000.0
+            val lon = Math.round(vt.longitude * 1000) / 1000.0
+            Toast.makeText(ctx, t("Đã lấy vị trí: $ten", "Location set: $ten"), Toast.LENGTH_SHORT).show()
+            chon(ThanhPho(ten, lat, lon))
+        }
+    }
+
+    val xinQuyen = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { kq ->
+        if (kq.values.any { it }) dungViTri()
+        else baoViTri = t(
+            "Chưa có quyền vị trí. Bạn có thể cấp trong Cài đặt > Ứng dụng > CleanTxa > Quyền, hoặc chọn tỉnh / thành bên dưới.",
+            "Location permission wasn't granted. You can allow it in Settings > Apps > CleanTxa > Permissions, or pick a province / city below.",
+        )
+    }
+
+    val tinh = tinhChon
+    val tinhKhop = remember(query, provinces) { XaPhuong.timTinh(provinces, query) }
+    val xaKhop = remember(query, wards, tinh) {
+        if (tinh == null) { if (query.isBlank()) emptyList() else XaPhuong.timXa(wards, query, 10) }
+        else XaPhuong.locXa(XaPhuong.xaCuaTinh(wards, tinh), query)
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(t("Chọn địa điểm thời tiết", "Choose weather location")) },
+        title = {
+            Text(if (tinh == null) t("Chọn tỉnh / thành phố", "Choose province / city") else tinh.ten)
+        },
         text = {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it; worldResults = null },
-                    label = { Text(t("Tìm phường/xã hoặc thành phố…", "Search ward or city…")) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (query.isNotBlank()) {
-                    OutlinedButton(onClick = {
-                        scope.launch {
-                            worldResults = withContext(Dispatchers.IO) {
-                                XaPhuong.timTheGioi(query, NgonNgu.tiengViet)
-                            }
-                        }
-                    }) {
-                        Text(t("Tìm thành phố nước ngoài", "Search worldwide cities"))
+                if (tinh == null) {
+                    OutlinedButton(
+                        onClick = {
+                            if (ViTriHienTai.coQuyen(ctx)) dungViTri()
+                            else xinQuyen.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+                        },
+                        enabled = !dangLayViTri,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.MyLocation, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (dangLayViTri) t("Đang lấy vị trí…", "Getting your location…") else t("Dùng vị trí hiện tại", "Use my current location"))
                     }
-                }
-                LazyColumn(Modifier.height(260.dp)) {
-                    if (query.isBlank()) {
-                        items(THANH_PHO) { tp ->
-                            Column(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable { vm.thanhPho = tp; onDismiss() }
-                                    .padding(vertical = 8.dp)
-                            ) {
-                                Text(tp.ten, fontWeight = FontWeight.Medium)
+                    if (baoViTri.isNotBlank()) {
+                        Text(baoViTri, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it; worldResults = null },
+                        label = { Text(t("Tìm tỉnh / thành, phường / xã…", "Search province, ward…")) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (query.isNotBlank()) {
+                        OutlinedButton(onClick = {
+                            scope.launch {
+                                worldResults = withContext(Dispatchers.IO) { XaPhuong.timTheGioi(query, NgonNgu.tiengViet) }
                             }
+                        }) {
+                            Text(t("Tìm thành phố nước ngoài", "Search worldwide cities"))
                         }
-                    } else {
-                        items(matchedWards) { x ->
-                            Column(
-                                Modifier
+                    }
+                    LazyColumn(Modifier.height(260.dp)) {
+                        items(tinhKhop) { p ->
+                            Text(
+                                p.ten,
+                                modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable {
-                                        vm.thanhPho = ThanhPho(x.tenNgan, x.lat, x.lon)
-                                        onDismiss()
-                                    }
-                                    .padding(vertical = 8.dp)
-                            ) {
-                                Text(x.ten, fontWeight = FontWeight.Medium)
-                                Text(x.tinh, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+                                    .clickable { tinhChon = p; query = "" }
+                                    .padding(vertical = 10.dp),
+                                fontWeight = FontWeight.Medium,
+                            )
                         }
-                        worldResults?.let { wr ->
-                            items(wr) { x ->
+                        if (query.isNotBlank()) {
+                            items(xaKhop) { x ->
                                 Column(
                                     Modifier
                                         .fillMaxWidth()
-                                        .clickable {
-                                            vm.thanhPho = ThanhPho(x.ten, x.lat, x.lon)
-                                            onDismiss()
-                                        }
-                                        .padding(vertical = 8.dp)
+                                        .clickable { chon(ThanhPho(x.tenNgan, x.lat, x.lon)) }
+                                        .padding(vertical = 8.dp),
                                 ) {
                                     Text(x.ten, fontWeight = FontWeight.Medium)
                                     Text(x.tinh, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
+                            worldResults?.let { wr ->
+                                items(wr) { x ->
+                                    Column(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .clickable { chon(ThanhPho(x.ten, x.lat, x.lon)) }
+                                            .padding(vertical = 8.dp),
+                                    ) {
+                                        Text(x.ten, fontWeight = FontWeight.Medium)
+                                        Text(x.tinh, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Text(
+                        t(
+                            "Chọn phường / xã. Không muốn chọn thì chọn dòng cuối danh sách (tên ${tinh.tenNgan}).",
+                            "Pick a ward. If you'd rather not, choose the last line of the list (${tinh.tenNgan}).",
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        label = { Text(t("Tìm phường / xã…", "Search ward…")) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    LazyColumn(Modifier.height(300.dp)) {
+                        items(xaKhop) { x ->
+                            Text(
+                                x.ten,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { chon(ThanhPho(x.tenNgan, x.lat, x.lon)) }
+                                    .padding(vertical = 10.dp),
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                        // Dòng cuối luôn có, kể cả khi đang lọc: chọn cả tỉnh / thành phố, không cần chọn phường / xã.
+                        item {
+                            Text(
+                                t("${tinh.ten} (cả tỉnh / thành phố)", "${tinh.ten} (whole province / city)"),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { chon(ThanhPho(tinh.tenNgan, tinh.lat, tinh.lon)) }
+                                    .padding(vertical = 12.dp),
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
                         }
                     }
                 }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(t("Đóng", "Close")) } },
+        dismissButton = if (tinh != null) {
+            { TextButton(onClick = { tinhChon = null; query = "" }) { Text(t("Đổi tỉnh / thành", "Change province")) } }
+        } else null,
     )
 }
 
