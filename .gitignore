@@ -10,3 +10,6 @@ captures/
 !app/src/main/assets/*.apk
 *.aab
 backups/
+
+# Khoá ký APK: không đưa lên GitHub
+keystore/

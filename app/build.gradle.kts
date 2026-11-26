@@ -19,9 +19,27 @@ android {
         versionName = "1.3.5"
     }
 
+    // Khoá ký cố định cho mọi bản phát hành (để cập nhật đè được). File nằm ở keystore/ và không đưa lên GitHub;
+    // bản sao lưu ở Documents\CleanTxa-khoa-ky. Mất file này thì người dùng phải gỡ app rồi cài lại.
+    val khoaKy = rootProject.file("keystore/cleantxa.keystore")
+    signingConfigs {
+        if (khoaKy.isFile) {
+            create("cleantxa") {
+                storeFile = khoaKy
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfigs.findByName("cleantxa")?.let { signingConfig = it }
+        }
         release {
             isMinifyEnabled = false
+            signingConfigs.findByName("cleantxa")?.let { signingConfig = it }
         }
     }
 
