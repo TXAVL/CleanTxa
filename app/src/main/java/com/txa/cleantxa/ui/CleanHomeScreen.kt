@@ -507,12 +507,79 @@ private fun SettingsTab(vm: PhienLamViec) {
             }
         }
         Spacer(Modifier.height(6.dp))
-        ToggleRow(t("Tất cả app một hàng", "Single-row app bar"), checked = vm.motHang, onCheckedChange = { vm.motHang = it })
+        ToggleRow(t("Tất cả app một hàng (Dock gọn)", "Single-row app bar"), checked = vm.motHang, onCheckedChange = { vm.motHang = it })
+        ToggleRow(t("Hiện tên ứng dụng nổi bật trên Dock", "Show focused app title above Dock"), checked = vm.tenToTrenDock, onCheckedChange = { vm.tenToTrenDock = it })
+        ToggleRow(t("Hiệu ứng kính mờ & viền phát sáng", "Frosted glass Dock & focus glow"), checked = vm.hieuUngKinh, onCheckedChange = { vm.hieuUngKinh = it })
         ToggleRow(t("Ô icon đều nhau", "Uniform icon tiles"), checked = vm.oDeuNhau, onCheckedChange = { vm.oDeuNhau = it })
+        ToggleRow(t("Khung kính mờ sau đồng hồ", "Translucent panel behind clock"), checked = vm.khungDau, onCheckedChange = { vm.khungDau = it })
         ToggleRow(t("Chữ trắng sáng", "Bright white text"), checked = vm.chuTrang, onCheckedChange = { vm.chuTrang = it })
         ToggleRow(t("Nút Wi-Fi / Cài đặt sát mép trên", "Compact top buttons"), checked = vm.gonNut, onCheckedChange = { vm.gonNut = it })
+        ToggleRow(t("Hiện thông số RAM & Bộ nhớ trên Home", "Show RAM & storage stats on Home"), checked = vm.hienThongSo, onCheckedChange = { vm.hienThongSo = it })
         ToggleRow(t("Hiện nút Cổng HDMI (Input)", "Show HDMI Input button"), checked = vm.nutInput, onCheckedChange = { vm.nutInput = it })
         ToggleRow(t("Hiện nút Hẹn giờ tắt trên Home", "Show Sleep timer button on Home"), checked = vm.nutHenTat, onCheckedChange = { vm.nutHenTat = it })
+
+        Spacer(Modifier.height(8.dp))
+        Text(t("Cỡ cụm đồng hồ: ${vm.coChuDau}%", "Clock header scale: ${vm.coChuDau}%"), style = MaterialTheme.typography.bodyMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(80 to t("Nhỏ (80%)", "Small"), 100 to t("Chuẩn (100%)", "Default"), 120 to t("Lớn (120%)", "Large"), 140 to t("Rất lớn (140%)", "XL")).forEach { (sc, label) ->
+                FilterChip(
+                    selected = vm.coChuDau == sc,
+                    onClick = { vm.coChuDau = sc },
+                    label = { Text(label) },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        Text(t("Màu chữ đồng hồ & thời tiết", "Clock & weather text colour"), style = MaterialTheme.typography.bodyMedium)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            val clockColors = listOf(
+                null to Color.White,
+                "#FEF08A" to Color(0xFFFEF08A),
+                "#99F6E4" to Color(0xFF99F6E4),
+                "#BAE6FD" to Color(0xFFBAE6FD),
+                "#DDD6FE" to Color(0xFFDDD6FE),
+                "#FECDD3" to Color(0xFFFECDD3),
+            )
+            clockColors.forEach { (hex, col) ->
+                val sel = vm.mauChu?.equals(hex, ignoreCase = true) == true || (hex == null && vm.mauChu == null)
+                Box(
+                    Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(col)
+                        .border(if (sel) 3.dp else 1.dp, if (sel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, CircleShape)
+                        .clickable { vm.mauChu = hex },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (sel) Icon(Icons.Default.Check, null, tint = Color(0xFF0B1118), modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        Text(t("Độ tối lớp phủ hình nền: ${vm.lamToiNen}%", "Wallpaper dim overlay: ${vm.lamToiNen}%"), style = MaterialTheme.typography.bodyMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(0, 20, 35, 50, 70).forEach { dim ->
+                FilterChip(
+                    selected = vm.lamToiNen == dim,
+                    onClick = { vm.lamToiNen = dim },
+                    label = { Text(if (dim == 0) t("0% (Rõ ảnh)", "0%") else "$dim%") },
+                )
+            }
+        }
+        ToggleRow(
+            title = t("Hiện nút Ngủ trên Home", "Show Sleep button on Home"),
+            subtitle = t("Tivi / máy chiếu ngủ ngay khi bấm, bật lại bằng nút nguồn (Android 9+).", "Puts the TV / projector to sleep immediately; wake with power key (Android 9+)."),
+            checked = vm.nutNgu,
+            onCheckedChange = { vm.nutNgu = it },
+        )
+        ToggleRow(
+            title = t("Hiện nút Đa nhiệm trên Home", "Show Recent apps button on Home"),
+            subtitle = t("Mở màn đa nhiệm (app gần đây) của tivi ngay từ thanh nút trên cùng.", "Opens the TV's recent apps screen from the top bar."),
+            checked = vm.nutDaNhiem,
+            onCheckedChange = { vm.nutDaNhiem = it },
+        )
     }
 
     TxaCard(title = t("Nút Home & Phím Remote", "Home button & Remote keys"), icon = Icons.Default.Key) {
@@ -533,6 +600,29 @@ private fun SettingsTab(vm: PhienLamViec) {
             onCheckedChange = { vm.luonVeHome = it },
         )
         Spacer(Modifier.height(8.dp))
+        Text(
+            t(
+                "Nút VTVgo, FPT Play… trên remote không mở app nữa sau khi đổi Home? Bấm Dò, bấm nút đó trên remote, rồi chọn app (hoặc Đa nhiệm / Thư viện app).",
+                "A remote button stopped working after changing Home? Tap Learn, press that button on the remote, then pick an app (or Recent apps / App library).",
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (vm.phimGan.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                vm.phimGan.toList().forEach { d ->
+                    val goi = d.substringAfterLast(':')
+                    val ma = d.removeSuffix(":$goi")
+                    AssistChip(
+                        onClick = { vm.phimGan.remove(d) },
+                        label = { Text("$ma → ${tenDep(goi)}") },
+                        trailingIcon = { Icon(Icons.Default.Close, null, Modifier.size(14.dp)) },
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
         OutlinedButton(
             onClick = { vm.doPhimRemote() },
             enabled = !vm.dangBan && !vm.dangDoPhim,
@@ -540,15 +630,15 @@ private fun SettingsTab(vm: PhienLamViec) {
         ) {
             Text(t("Dò một nút trên remote (20 giây)", "Learn a remote key (20s)"))
         }
-        if (vm.phimVuaDo != null) {
+        vm.phimVuaDo?.let { (key, scan) ->
             Spacer(Modifier.height(8.dp))
             Text(
-                t("Chọn app mở khi bấm nút vừa dò:", "Choose app for the learned key:"),
+                t("Đã bắt được nút (mã ${if (scan > 0) scan else key}) — chọn hành động hoặc app:", "Caught button (code ${if (scan > 0) scan else key}) — choose action or app:"),
                 style = MaterialTheme.typography.labelMedium,
             )
             Spacer(Modifier.height(4.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                vm.appGanDuoc.take(12).forEach { pkg ->
+                (listOf("recents", "library") + vm.appGanDuoc).forEach { pkg ->
                     AssistChip(onClick = { vm.ganPhim(pkg) }, label = { Text(tenDep(pkg)) })
                 }
             }
@@ -586,12 +676,17 @@ private fun SettingsTab(vm: PhienLamViec) {
     }
 }
 
-/** Xem trước màn Home theo giao diện đang chọn: đồng hồ, dock, mô tả giao diện. */
+/** Xem trước màn Home theo giao diện đang chọn: đồng hồ, lời chào, thời tiết, màu nhấn, dock kính mờ. */
 @Composable
 private fun XemTruoc(vm: PhienLamViec) {
     val th = vm.themeChon
     val mau = th.mau.map { Color(it) }.let { if (it.size >= 2) it else it + it }
-    // Với CleanTxa Home, xem trước theo các công tắc đồng hồ: ẩn / hiện, giây, ngày, 12 / 24 giờ.
+    val accent = remember(vm.txaMauNhan) {
+        runCatching { Color(android.graphics.Color.parseColor(vm.txaMauNhan)) }.getOrDefault(Color(0xFF2EC4B6))
+    }
+    val clockColor = remember(vm.mauChu) {
+        vm.mauChu?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() } ?: Color.White
+    }
     val hienDongHo = !vm.homeTxa || vm.txaDongHo
     val gio24 = !vm.homeTxa || vm.txa24h
     val coGiay = vm.homeTxa && vm.txaGiay
@@ -609,17 +704,21 @@ private fun XemTruoc(vm: PhienLamViec) {
             java.time.format.DateTimeFormatter.ofPattern(if (vi) "EEEE, dd/MM/yyyy" else "EEEE, d MMMM yyyy", if (vi) java.util.Locale("vi", "VN") else java.util.Locale.getDefault()),
         )
     }
+    val cornerRadius = when (vm.txaBoGoc) {
+        "pill" -> 16.dp
+        "sharp" -> 4.dp
+        else -> 9.dp
+    }
     val anh = anhXemTruoc(vm.anhNenRieng, 4)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(160.dp)
+                .height(186.dp)
                 .clip(RoundedCornerShape(20.dp))
                 .background(Brush.linearGradient(mau)),
         ) {
             if (anh != null) {
-                // Đã chọn ảnh riêng: ảnh thay nền giao diện, phủ lớp tối đúng bằng mức "Làm tối hình nền".
                 Image(
                     bitmap = anh,
                     contentDescription = null,
@@ -628,27 +727,109 @@ private fun XemTruoc(vm: PhienLamViec) {
                 )
                 Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = (vm.lamToiNen / 100f).coerceIn(0f, 0.8f))))
             }
-            Column(Modifier.padding(18.dp)) {
-                if (hienDongHo) Text(gio, color = Color.White, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Light)
+            // Ánh sáng nền nhẹ theo màu nhấn ở nửa trên
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(90.dp)
+                    .background(Brush.verticalGradient(listOf(accent.copy(alpha = 0.22f), Color.Transparent))),
+            )
+
+            // Cụm đồng hồ bên trái
+            Column(
+                Modifier
+                    .padding(14.dp)
+                    .then(
+                        if (vm.khungDau) Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.Black.copy(alpha = 0.42f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                        else Modifier
+                    ),
+            ) {
+                if (!vm.anLoiChao) {
+                    val chao = vm.tenChao.takeIf { it.isNotBlank() }?.let { "${t("Xin chào", "Hello")}, $it" } ?: "CleanTxa Home"
+                    Text(chao, color = accent, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                }
+                if (hienDongHo) {
+                    val clockStyle = when {
+                        vm.coChuDau >= 130 -> MaterialTheme.typography.displayMedium
+                        vm.coChuDau <= 85 -> MaterialTheme.typography.headlineMedium
+                        else -> MaterialTheme.typography.displaySmall
+                    }
+                    Text(gio, color = clockColor, style = clockStyle, fontWeight = FontWeight.Light)
+                }
                 if (hienNgay) {
                     Text(
                         ngay + if (vm.amLich) " · " + t("âm lịch", "lunar") else "",
-                        color = Color.White.copy(alpha = 0.85f),
-                        style = MaterialTheme.typography.labelMedium,
+                        color = clockColor.copy(alpha = 0.85f),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+                vm.thanhPho?.let { tp ->
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        "☀ 28°C · ${tp.ten}",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(accent.copy(alpha = 0.28f))
+                            .padding(horizontal = 7.dp, vertical = 2.dp),
                     )
                 }
             }
+
+            // Hàng pill nhỏ góc trên phải
             Row(
-                Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(14.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Modifier.align(Alignment.TopEnd).padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                repeat(5) { n ->
+                val pills = buildList {
+                    if (vm.hienThongSo) add("RAM")
+                    if (vm.homeTxa && vm.txaHienIp) add("IP")
+                    if (vm.nutHenTat) add("⏱")
+                    if (vm.nutDaNhiem) add("❐")
+                    add("Wi-Fi")
+                    add("⚙")
+                }
+                pills.take(4).forEachIndexed { idx, p ->
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(if (idx == pills.lastIndex) accent else Color.White.copy(alpha = 0.18f))
+                            .padding(horizontal = 7.dp, vertical = 3.dp),
+                    ) {
+                        Text(p, color = if (idx == pills.lastIndex) Color(0xFF081018) else Color.White, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+
+            // Khay Dock ứng dụng phía dưới
+            Row(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(12.dp)
+                    .then(
+                        if (vm.hieuUngKinh) Modifier
+                            .clip(RoundedCornerShape(cornerRadius + 4.dp))
+                            .background(Color.White.copy(alpha = 0.14f))
+                            .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(cornerRadius + 4.dp))
+                            .padding(6.dp)
+                        else Modifier
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                val cols = (if (vm.soCot > 0) vm.soCot else 5).coerceIn(4, 7)
+                repeat(cols) { n ->
                     Box(
                         Modifier
                             .weight(1f)
                             .height(28.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.White.copy(alpha = 0.92f - n * 0.16f)),
+                            .clip(RoundedCornerShape(cornerRadius))
+                            .background(Color.White.copy(alpha = if (n == 0) 0.95f else (0.78f - n * 0.1f).coerceAtLeast(0.28f)))
+                            .then(if (n == 0) Modifier.border(2.dp, accent, RoundedCornerShape(cornerRadius)) else Modifier),
                     )
                 }
             }
@@ -757,7 +938,34 @@ private fun TxaHomeTuyChinh(vm: PhienLamViec) {
         }
     }
 
-    TxaCard(title = t("Ô ứng dụng & thanh trên", "App tiles & top bar"), icon = Icons.Default.Apps) {
+    TxaCard(title = t("Màu nhấn, Ô ứng dụng & Thanh trên", "Accent colour, App tiles & Top bar"), icon = Icons.Default.Apps) {
+        Text(t("Màu nhấn giao diện (viền chọn, lời chào, nút)", "Accent colour (focus ring, greeting, pills)"), style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            listOf(
+                "#2EC4B6" to Color(0xFF2EC4B6),
+                "#10B981" to Color(0xFF10B981),
+                "#38BDF8" to Color(0xFF38BDF8),
+                "#A78BFA" to Color(0xFFA78BFA),
+                "#F59E0B" to Color(0xFFF59E0B),
+                "#FB7185" to Color(0xFFFB7185),
+                "#FFFFFF" to Color(0xFFFFFFFF),
+            ).forEach { (hex, col) ->
+                val sel = vm.txaMauNhan.equals(hex, ignoreCase = true)
+                Box(
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(col)
+                        .border(if (sel) 3.dp else 1.dp, if (sel) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline, CircleShape)
+                        .clickable { vm.txaMauNhan = hex; vm.luuTuyChonTxa() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (sel) Icon(Icons.Default.Check, null, tint = Color(0xFF0B1118), modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
         Text(t("Cỡ ô ứng dụng", "App tile size"), style = MaterialTheme.typography.bodyMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("small" to t("Nhỏ", "Small"), "medium" to t("Vừa", "Medium"), "large" to t("Lớn", "Large")).forEach { (khoa, nhan) ->
@@ -769,13 +977,24 @@ private fun TxaHomeTuyChinh(vm: PhienLamViec) {
             }
         }
         Spacer(Modifier.height(6.dp))
+        Text(t("Kiểu bo góc ô ứng dụng", "Tile corner style"), style = MaterialTheme.typography.bodyMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("rounded" to t("Bo mềm", "Rounded"), "pill" to t("Siêu bo", "Pill"), "sharp" to t("Vuông gọn", "Sharp")).forEach { (khoa, nhan) ->
+                FilterChip(
+                    selected = vm.txaBoGoc == khoa,
+                    onClick = { vm.txaBoGoc = khoa; vm.luuTuyChonTxa() },
+                    label = { Text(nhan) },
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
         ToggleRow(
             title = t("Nút Wi-Fi", "Wi-Fi button"),
             checked = vm.txaNutWifi,
             onCheckedChange = { vm.txaNutWifi = it; vm.luuTuyChonTxa() },
         )
         ToggleRow(
-            title = t("Nút Cài đặt", "Settings button"),
+            title = t("Nút Cài đặt (giữ OK mở Cài đặt nhanh)", "Settings button (hold OK for Quick Settings)"),
             checked = vm.txaNutCaiDat,
             onCheckedChange = { vm.txaNutCaiDat = it; vm.luuTuyChonTxa() },
         )

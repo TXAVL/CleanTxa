@@ -452,7 +452,7 @@ fun navigateBack(vm: PhienLamViec) {
         Man.HUONG_DAN, Man.GIAY_PHEP, Man.LOGS -> vm.man = vm.manTruoc
         Man.TV_LOI_QR -> vm.man = Man.CHINH
         Man.KET_NOI -> vm.veManChinh()
-        Man.THONG_TIN -> vm.veManChinh()
+        Man.THONG_TIN -> if (!vm.dangAdb && vm.dangLienKetNgam) { vm.loi = ""; vm.man = Man.CHINH } else vm.veManChinh()
         Man.CHON_GOI, Man.KHOI_PHUC, Man.KHOA_TRE, Man.REMOTE -> vm.man = Man.THONG_TIN
         Man.HOME_SACH -> vm.man = if (vm.coDauCleanTv) Man.THONG_TIN else Man.CHON_GOI
         Man.DANG_TAT -> if (!vm.dangBan) vm.man = Man.CHON_GOI

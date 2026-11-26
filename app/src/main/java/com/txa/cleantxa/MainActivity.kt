@@ -37,6 +37,10 @@ class MainActivity : ComponentActivity() {
         NgonNgu.nap(this, chuyenLuaChonCu = true)
         ManHinh.doc(this)
         TxaLogger.init(this)
+        if (ManHinh.laTv) {
+            com.txa.cleantxa.link.TxaLinkStore.danhDauDaMoTrenTv(this)
+            com.txa.cleantxa.link.TxaLinkService.start(this)
+        }
         CapNhat.donOtaCuNeuDoiBan(this)
         ThongBaoCapNhat.hen(this)
         docYDinh(intent)
@@ -64,9 +68,30 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun docYDinh(i: Intent?) {
-        if (i?.getBooleanExtra(ThongBaoCapNhat.MO_CAP_NHAT, false) == true) {
+        if (i == null) return
+        if (i.getBooleanExtra(ThongBaoCapNhat.MO_CAP_NHAT, false)) {
             CapNhat.moTuThongBao = true
             i.removeExtra(ThongBaoCapNhat.MO_CAP_NHAT)
+        }
+        if (!ManHinh.laTv && i.action == Intent.ACTION_SEND) {
+            val mime = i.type.orEmpty()
+            if (mime.startsWith("image/")) {
+                val uri = if (Build.VERSION.SDK_INT >= 33) {
+                    i.getParcelableExtra(Intent.EXTRA_STREAM, android.net.Uri::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    i.getParcelableExtra(Intent.EXTRA_STREAM)
+                }
+                if (uri != null) {
+                    com.txa.cleantxa.link.TxaLinkStore.pendingSharedImageUri = uri
+                }
+            } else {
+                val txt = i.getStringExtra(Intent.EXTRA_TEXT)?.trim()
+                if (!txt.isNullOrBlank()) {
+                    com.txa.cleantxa.link.TxaLinkStore.pendingSharedText = txt
+                }
+            }
+            i.action = Intent.ACTION_MAIN
         }
     }
 }

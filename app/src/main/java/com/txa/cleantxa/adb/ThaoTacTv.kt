@@ -933,7 +933,7 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
     private fun giuTrangThaiTxa(json: String): String {
         val moi = runCatching { org.json.JSONObject(json) }.getOrNull() ?: return json
         val cu = docCauHinhTv() ?: return json
-        for (k in listOf("kids_mode", "kids_apps", "kids_pin", "hidden_apps")) {
+        for (k in listOf("kids_mode", "kids_apps", "kids_pin", "hidden_apps", "open_on_start_pkg")) {
             if (!moi.has(k) && cu.has(k)) moi.put(k, cu.get(k))
         }
         return moi.toString()
@@ -1569,10 +1569,10 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
     /** App người dùng tự cài (gỡ được). */
     fun appTuCai(): Set<String> = sh("pm list packages -3").lines().map { it.substringAfter("package:").trim() }.filter { it.isNotBlank() }.toSet()
 
-    /** App tự cài chỉ có lối vào kiểu điện thoại, để Home sạch hiện cả khi Thư viện app tắt (dulieu/AppNgoai). */
-    fun appNgoaiKhongLoiTv(): Set<String> = com.txa.cleantxa.dulieu.AppNgoai.loc(
+    /** App tự cài (hoặc chọn vào dock) chỉ có lối vào kiểu điện thoại, để Home sạch hiện cả khi Thư viện app tắt (dulieu/AppNgoai). */
+    fun appNgoaiKhongLoiTv(dock: Set<String> = emptySet()): Set<String> = com.txa.cleantxa.dulieu.AppNgoai.loc(
         appTuCai(), lopActivity("android.intent.category.LAUNCHER"),
-        lopActivity("android.intent.category.LEANBACK_LAUNCHER"), lopActivity("android.intent.category.HOME"))
+        lopActivity("android.intent.category.LEANBACK_LAUNCHER"), lopActivity("android.intent.category.HOME"), dock)
 
     /** Mở một app trên tivi (màn chính kiểu tivi, không có thì kiểu điện thoại). */
     fun moApp(pkg: String): Boolean {
@@ -1607,6 +1607,34 @@ class ThaoTacTv(private val adb: KetNoiAdb, private val kho: KhoSaoLuu) {
     fun datManChoDong(bat: Boolean, sl: BanSaoLuu?) {
         if (bat) sh("settings put secure screensaver_components $pkgHome/$NS_HOME.ClockDream; settings put secure screensaver_enabled 1")
         else if (sh("settings get secure screensaver_components").contains("$NS_HOME.ClockDream")) chuanBiManCho(sl)
+    }
+
+    /**
+     * Khi trên TV đã cài sẵn CleanTxa (com.txa.cleantxa), tự cấp quyền cần thiết + bật dịch vụ trợ năng Liên kết +
+     * đăng ký khoá tin cậy cho điện thoại này, để sau khi tắt ADB hai máy vẫn tự kết nối ngầm qua Wi-Fi.
+     */
+    fun kichHoatLienKetTrenTv(phoneId: String, phoneName: String, token: String) {
+        val safeName = phoneName.replace("'", "").take(48)
+        sh(
+            "appops set $PKG_CLEANTV SYSTEM_ALERT_WINDOW allow 2>/dev/null; " +
+                "appops set $PKG_CLEANTV REQUEST_INSTALL_PACKAGES allow 2>/dev/null; " +
+                "appops set $PKG_CLEANTV APP_AUTO_START allow 2>/dev/null; " +
+                "cmd appops set $PKG_CLEANTV AUTO_START allow 2>/dev/null; true"
+        )
+        if (!laBoMachCvte()) {
+            val svc = "$PKG_CLEANTV/com.txa.cleantxa.link.TxaLinkAccessibilityService"
+            sh(
+                "s=\$(settings get secure enabled_accessibility_services); " +
+                    "case \"\$s\" in *TxaLinkAccessibilityService*) ;; " +
+                    "null|'') settings put secure enabled_accessibility_services $svc ;; " +
+                    "*) settings put secure enabled_accessibility_services \"\$s:$svc\" ;; esac; " +
+                    "settings put secure accessibility_enabled 1"
+            )
+        }
+        sh(
+            "am broadcast -a com.txa.cleantxa.START_LINK -n $PKG_CLEANTV/com.txa.cleantxa.link.TxaLinkBootReceiver " +
+                "--es phone_id '$phoneId' --es phone_name '$safeName' --es token '$token' >/dev/null 2>&1; true"
+        )
     }
 
     /** Tắt ADB qua mạng trên tivi. Lệnh cuối làm rớt kết nối này, nên lỗi ở đây là bình thường. */

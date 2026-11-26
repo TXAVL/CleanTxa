@@ -7,7 +7,7 @@
 android
 
 ## Stack
-Kotlin + Jetpack Compose (Material 3), two Gradle modules: `:app` (phone app, `com.txa.cleantxa`, v1.2.8) and `:launcher` (the clean TV home screen, `com.gathin.tvhome`). ADB is done in-app with `libadb-android` (JitPack) plus Conscrypt and BouncyCastle for the keys and certificate; the earlier `dadb` choice was dropped. Build: Gradle 9.9.1, AGP 9.5.1, Kotlin 2.4.21, compileSdk 37, targetSdk 36, minSdk 26, JDK 17, Android SDK at C:\Android. Code identifiers are mostly Vietnamese without diacritics (`ThaoTacTv`, `PhienLamViec`, `KeHoach`). Unit tests cover updates, formatting, the disable plan, restore, advanced options and TV model matching.
+Kotlin + Jetpack Compose (Material 3), two Gradle modules: `:app` (phone app, `com.txa.cleantxa`, v1.3.5) and `:launcher` (the clean TV home screen, `com.gathin.tvhome`). ADB is done in-app with `libadb-android` (JitPack) plus Conscrypt and BouncyCastle for the keys and certificate; the earlier `dadb` choice was dropped. Build: Gradle 9.9.1, AGP 9.5.1, Kotlin 2.4.21, compileSdk 37, targetSdk 36, minSdk 26, JDK 17, Android SDK at C:\Android. Code identifiers are mostly Vietnamese without diacritics (`ThaoTacTv`, `PhienLamViec`, `KeHoach`). Unit tests cover updates, formatting, the disable plan, restore, advanced options and TV model matching.
 
 ## Users
 General, non-technical people sitting next to an Android TV / Google TV who want to clean it of manufacturer telemetry, ads and bloat using only their phone. Many have never enabled developer options or ADB and need to be walked through it. The app also runs on a TV itself (it declares the leanback launcher category and a TV banner).

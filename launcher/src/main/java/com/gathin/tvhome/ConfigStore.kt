@@ -17,11 +17,17 @@ data class LinkTile(
 
 data class LauncherConfig(
     val backgroundColor: Int = Color.parseColor("#0B1118"),
+    val accentColor: Int = Color.parseColor("#2EC4B6"),
+    val headerColor: Int? = null,
+    val headerScale: Int = 100,
+    val headerPanel: Boolean = false,
     val skyIntensity: Int = 55,
     val wallpaperEnabled: Boolean = false,
     val wallpaperFitFrame: Boolean = false,
     val wallpaperRotationMinutes: Int = 0,
     val dockGlass: Boolean = true,
+    val dockTitle: Boolean = true,
+    val appGlow: Boolean = false,
     val headerWhite: Boolean = true,
     val showGreeting: Boolean = true,
     val greetingName: String = "",
@@ -34,15 +40,23 @@ data class LauncherConfig(
     val uniformTiles: Boolean = true,
     val showInputButton: Boolean = true,
     val showSleepButton: Boolean = false,
+    val showSleepTimerButton: Boolean = false,
+    val showRecentsButton: Boolean = false,
     val showNowPlaying: Boolean = true,
+    val showStats: Boolean = false,
+    val dreamMotion: Boolean = false,
     val showClockSeconds: Boolean = false,
     val showNetworkIp: Boolean = false,
     val tileScale: String = "medium",
+    val tileCornerStyle: String = "rounded",
     val wallpaperDim: Int = 35,
     val stockHomeRedirect: Boolean = false,
+    val stockHomePackage: String = "",
     val powerOnHomeAlways: Boolean = false,
+    val openOnStartPkg: String = "",
     val volumeKeyRepeat: Boolean = false,
     val appKeys: Map<Int, String> = emptyMap(),
+    val appScancodes: Map<Int, String> = emptyMap(),
     val settingsKeycodes: Set<Int> = emptySet(),
     val dockApps: List<String> = emptyList(),
     val hiddenApps: Set<String> = emptySet(),
@@ -72,9 +86,11 @@ data class LauncherConfig(
 
 object ConfigStore {
     const val ACTION_RELOAD_CONFIG = "zone.vgs.cleantv.RELOAD_CONFIG"
-    const val ACTION_LEARN_KEY = "com.gathin.tvhome.LEARN_KEY"
+    const val ACTION_LEARN_KEY = "zone.vgs.cleantv.LEARN_KEY"
     const val ACTION_KEY_LEARNED = "com.gathin.tvhome.KEY_LEARNED"
-    const val ACTION_TYPE_TEXT = "com.gathin.tvhome.TYPE_TEXT"
+    const val ACTION_TYPE_TEXT = "zone.vgs.cleantv.TYPE_TEXT"
+    const val ACTION_OPEN_LIBRARY = "com.gathin.tvhome.OPEN_LIBRARY"
+    const val KEY_UNKNOWN_SCAN = 240
 
     fun configFile(ctx: Context): File = File(ctx.filesDir, "config.json")
     fun wallpaperFile(ctx: Context): File = File(ctx.filesDir, "wallpaper.jpg")
@@ -90,13 +106,31 @@ object ConfigStore {
         val bgStr = j.optString("background_color", "#0B1118")
         val bg = runCatching { Color.parseColor(bgStr) }.getOrDefault(Color.parseColor("#0B1118"))
 
-        val appKeysMap = HashMap<Int, String>()
+        val accentStr = j.optString("accent_color", "#2EC4B6")
+        val accent = runCatching { Color.parseColor(accentStr) }.getOrDefault(Color.parseColor("#2EC4B6"))
+
+        val hdrColor = j.optString("header_color", "").takeIf { it.startsWith("#") && it.length in 7..9 }
+            ?.let { runCatching { Color.parseColor(it) }.getOrNull() }
+
+        val appKeysMap = LinkedHashMap<Int, String>()
+        val appScanMap = LinkedHashMap<Int, String>()
         j.optJSONArray("app_keys")?.let { arr ->
             for (i in 0 until arr.length()) {
-                val item = arr.optString(i)
-                val code = item.substringBefore(':').toIntOrNull()
-                val pkg = item.substringAfter(':', "")
-                if (code != null && pkg.isNotBlank()) appKeysMap[code] = pkg
+                val item = arr.optString(i).trim()
+                if (item.startsWith("scan:", ignoreCase = true)) {
+                    val rest = item.substringAfter(':')
+                    val scan = rest.substringBefore(':').trim().toIntOrNull()
+                    val pkg = rest.substringAfter(':', "").trim()
+                    if (scan != null && scan > 0 && scan != KEY_UNKNOWN_SCAN && pkg.isNotBlank()) {
+                        appScanMap.putIfAbsent(scan, pkg)
+                    }
+                } else {
+                    val code = item.substringBefore(':').trim().toIntOrNull()
+                    val pkg = item.substringAfter(':', "").trim()
+                    if (code != null && code > 0 && pkg.isNotBlank()) {
+                        appKeysMap.putIfAbsent(code, pkg)
+                    }
+                }
             }
         }
 
@@ -133,11 +167,17 @@ object ConfigStore {
 
         return LauncherConfig(
             backgroundColor = bg,
+            accentColor = accent,
+            headerColor = hdrColor,
+            headerScale = j.optInt("header_scale", 100).coerceIn(70, 160),
+            headerPanel = j.optBoolean("header_panel", false),
             skyIntensity = j.optInt("sky_intensity", 55).coerceIn(0, 100),
             wallpaperEnabled = j.optBoolean("wallpaper", false),
             wallpaperFitFrame = j.optBoolean("wallpaper_fit", false),
             wallpaperRotationMinutes = j.optInt("wallpaper_rotation_minutes", 0).coerceAtLeast(0),
             dockGlass = j.optBoolean("dock_glass", true),
+            dockTitle = j.optBoolean("dock_title", true),
+            appGlow = j.optBoolean("app_glow", false),
             headerWhite = j.optBoolean("header_white", true),
             showGreeting = j.optBoolean("show_greeting", true),
             greetingName = j.optString("greeting_name", ""),
@@ -149,16 +189,24 @@ object ConfigStore {
             singleRow = j.optBoolean("single_row", false),
             uniformTiles = j.optBoolean("uniform_tiles", true),
             showInputButton = j.optBoolean("show_input_button", true),
-            showSleepButton = j.optBoolean("show_sleep_button", false),
+            showSleepButton = j.optBoolean("sleep_button", j.optBoolean("show_sleep_button", false)),
+            showSleepTimerButton = j.optBoolean("sleep_timer_button", false),
+            showRecentsButton = j.optBoolean("recents_button", false),
             showNowPlaying = j.optBoolean("show_now_playing", true),
+            showStats = j.optBoolean("show_stats", false),
+            dreamMotion = j.optBoolean("dream_motion", false),
             showClockSeconds = j.optBoolean("show_clock_seconds", false),
             showNetworkIp = j.optBoolean("show_network_ip", false),
             tileScale = j.optString("tile_scale", "medium").ifBlank { "medium" },
+            tileCornerStyle = j.optString("tile_corner_style", "rounded").ifBlank { "rounded" },
             wallpaperDim = j.optInt("wallpaper_dim", 35).coerceIn(0, 80),
-            stockHomeRedirect = j.optBoolean("stock_home_redirect", false),
+            stockHomeRedirect = j.optString("stock_home_redirect", "").isNotBlank() || j.optBoolean("stock_home_redirect", false),
+            stockHomePackage = j.optString("stock_home_redirect", "").takeIf { it != "true" && it != "false" }.orEmpty(),
             powerOnHomeAlways = j.optBoolean("power_on_home_always", false),
-            volumeKeyRepeat = j.optBoolean("volume_key_repeat", false),
+            openOnStartPkg = j.optString("open_on_start_pkg", ""),
+            volumeKeyRepeat = j.optBoolean("volume_key_repeat", !j.optBoolean("key_filter", true)),
             appKeys = appKeysMap,
+            appScancodes = appScanMap,
             settingsKeycodes = settingsCodes,
             dockApps = strList("dock_apps"),
             hiddenApps = strList("hidden_apps").toSet(),
@@ -187,4 +235,3 @@ object ConfigStore {
         f.writeText(j.toString(2), Charsets.UTF_8)
     }
 }
-

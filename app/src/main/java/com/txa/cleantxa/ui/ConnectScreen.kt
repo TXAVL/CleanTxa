@@ -31,9 +31,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -103,6 +106,61 @@ fun ConnectScreen(vm: PhienLamViec) {
                     Text(t("Kết nối tivi này", "Connect this TV"))
                 }
             }
+        }
+
+        if (!ManHinh.laTv && vm.dsTvLink.isNotEmpty()) {
+            TxaCard(
+                title = t("Tivi có TxaLink (Không cần ADB)", "TVs with TxaLink (No ADB needed)"),
+                subtitle = t(
+                    "Kết nối thẳng qua Wi-Fi với app CleanTxa đang chạy ngầm trên tivi — dùng Remote, cài APK và đổi giao diện Home sạch kể cả khi đã tắt ADB.",
+                    "Connect directly over Wi-Fi to CleanTxa running in the background on your TV — works even with ADB turned off.",
+                ),
+                icon = Icons.Default.Phonelink,
+                highlighted = true,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    vm.dsTvLink.forEach { d ->
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(d.name, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    "${d.ip} · Android ${d.androidVer}" + if (d.isTrusted) t(" · Đã tin cậy", " · Trusted") else "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Button(
+                                onClick = { vm.chonTvLink(d, chuyenMan = true) },
+                                enabled = !vm.dangBan,
+                            ) {
+                                Icon(Icons.Default.Link, null, Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(if (d.isTrusted) t("Kết nối ngầm", "Link") else t("Ghép tin cậy", "Trust & Link"))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        vm.maGhepLinkDangCho?.let { pin ->
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text(t("Mã xác nhận liên kết: $pin", "Link verification code: $pin")) },
+                text = {
+                    Text(
+                        t(
+                            "Nhìn lên màn hình tivi và bấm \"Tin tưởng & Cho phép\" trên hộp thoại có mã $pin.\n\n(Chỉ cần xác nhận một lần duy nhất — từ lần sau hai máy sẽ tự kết nối ngầm khi chung mạng Wi-Fi).",
+                            "Look at your TV screen and select \"Trust & Allow\" on the prompt showing code $pin.\n\n(One-time setup — next time both devices will auto-connect silently over Wi-Fi)."
+                        )
+                    )
+                },
+                confirmButton = {},
+            )
         }
 
         TxaCard(

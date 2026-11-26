@@ -115,6 +115,10 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     var txa24h by mutableStateOf(prefs.getBoolean("txa_24h", true))
     /** Cỡ ô app: "small" | "medium" | "large". */
     var txaCoO by mutableStateOf(prefs.getString("txa_co_o", "medium") ?: "medium")
+    /** Kiểu bo góc ô app: "rounded" | "pill" | "sharp". */
+    var txaBoGoc by mutableStateOf(prefs.getString("txa_bo_goc", "rounded") ?: "rounded")
+    /** Màu nhấn giao diện CleanTxa Home ("#RRGGBB"). */
+    var txaMauNhan by mutableStateOf(prefs.getString("txa_mau_nhan", "#2EC4B6") ?: "#2EC4B6")
     var txaNutWifi by mutableStateOf(prefs.getBoolean("txa_nut_wifi", true))
     var txaNutCaiDat by mutableStateOf(prefs.getBoolean("txa_nut_cai_dat", true))
     var txaHienIp by mutableStateOf(prefs.getBoolean("txa_hien_ip", false))
@@ -123,6 +127,7 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
             .putBoolean("txa_nguon", txaNguon).putBoolean("txa_nut_tre", txaNutTreEm)
             .putBoolean("txa_dong_ho", txaDongHo).putBoolean("txa_giay", txaGiay).putBoolean("txa_ngay", txaNgay)
             .putBoolean("txa_24h", txa24h).putString("txa_co_o", txaCoO)
+            .putString("txa_bo_goc", txaBoGoc).putString("txa_mau_nhan", txaMauNhan)
             .putBoolean("txa_nut_wifi", txaNutWifi).putBoolean("txa_nut_cai_dat", txaNutCaiDat).putBoolean("txa_hien_ip", txaHienIp)
             .apply()
     }
@@ -157,6 +162,27 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     var ghepMa by mutableStateOf("")
     var dangTimGhep by mutableStateOf(false)
     val dsGhepTimThay = mutableStateListOf<String>()
+
+    // Liên kết ngầm không cần ADB (CleanTxa Link cổng 2312)
+    var linkClient by mutableStateOf<com.txa.cleantxa.link.TxaLinkClient?>(null)
+        private set
+    /** true khi đang giữ phiên ADB thật; false khi đang nối ngầm qua Wi-Fi Link (ADB trên TV có thể đã tắt hoàn toàn). */
+    var dangAdb by mutableStateOf(false)
+        private set
+    val dangLienKetNgam: Boolean get() = linkClient != null
+    val dsTvLink = mutableStateListOf<com.txa.cleantxa.link.TxaLinkClient.DiscoveredTv>()
+    var dangQuetLink by mutableStateOf(false)
+    /** Mã đối chiếu 4 số khi điện thoại đang chờ người dùng bấm "Tin tưởng" trên màn hình TV. */
+    var maGhepLinkDangCho by mutableStateOf<String?>(null)
+    var ramTv by mutableStateOf<Pair<Long, Long>?>(null)
+    /** Trạng thái độc quyền của CleanTxa Link: âm lượng (hiện tại, tối đa), độ tối ban đêm (0..75%), đang chiếu ảnh, app đang mở. */
+    var amLuongTv by mutableStateOf<Pair<Int, Int>?>(null)
+    var doToiTv by mutableStateOf(0)
+    var dangChieuAnhTv by mutableStateOf(false)
+    var appDangMoTrenTv by mutableStateOf("")
+    var linkCanBan by mutableStateOf("")
+    var tinNhanTv by mutableStateOf("")
+    var docToTinNhanTv by mutableStateOf(true)
 
     // Tivi
     var thongTin by mutableStateOf<ThongTinTv?>(null)
@@ -242,7 +268,15 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     /** Ô icon đều nhau kiểu Apple TV: icon trên nền màu của chính nó, không dùng ảnh banner (uniform_tiles). */
     var oDeuNhau by mutableStateOf(false)
     /** Chọn theme trên màn: công tắc ô icon đều nhau theo theme mới, người dùng vẫn đổi lại được sau đó. */
-    fun chonTheme(th: com.txa.cleantxa.dulieu.Theme) { themeChon = th; oDeuNhau = th.cauHinh["uniform_tiles"] == true; anLoiChao = th.cauHinh["show_greeting"] == false }
+    fun chonTheme(th: com.txa.cleantxa.dulieu.Theme) {
+        themeChon = th
+        oDeuNhau = th.cauHinh["uniform_tiles"] == true
+        anLoiChao = th.cauHinh["show_greeting"] == false
+        hieuUngKinh = th.cauHinh["dock_glass"] == true
+        khungDau = th.cauHinh["header_panel"] == true
+        mauChu = th.cauHinh["header_color"] as? String
+        (th.cauHinh["accent_color"] as? String)?.let { txaMauNhan = it; luuTuyChonTxa() }
+    }
     /** Số app mỗi hàng (columns của launcher, 0 = theo theme), góp ý 24/10/2026: Sony chỉ có 4 app một hàng. */
     var soCot by mutableStateOf(0)
     /** Cho chọn app tự mở khi bật tivi (open_on_start_choice của launcher; góp ý dmenh568, quan1sd1998 24/10/2026). */
@@ -263,6 +297,8 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     /** Nút Ngủ trên Home sạch (sleep_button, cần HomeKeyService, Android 9+). 4.1.2, góp ý hanhphucnoidau1999: máy chiếu remote
      *  chỉ có nút nguồn. Mặc định bật cho máy chiếu, tắt cho tivi; luôn ghi rõ vào config để lựa chọn không đổi theo máy. */
     var nutNgu by mutableStateOf(false)
+    /** Nút Đa nhiệm trên Home sạch (recents_button, cần HomeKeyService). */
+    var nutDaNhiem by mutableStateOf(false)
     /**
      * Nút remote người dùng tự gán (3.1.1, "Dò phím remote"; góp ý Hoàng Hữu: nút VTVgo của remote TCL 65C655 chết sau khi
      * tắt Home gốc). Mỗi dòng là một mục app_keys: "scan:<mã quét>:<gói>" hoặc "<keycode>:<gói>". Cần HomeKeyService lọc phím.
@@ -290,13 +326,15 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         val dau = if (scan > 0) "scan:$scan:" else "$key:"
         phimGan.removeAll { it.startsWith(dau) }
         phimGan.add(dau + goi)
+        // "library" chỉ mở Thư viện app khi app_library bật (tắt thì phím chỉ đưa về Home): gán là bật luôn.
+        if (goi == "library") thuVienApp = true
         phimVuaDo = null
     }
     /** App có biểu tượng trên tivi, để gán cho nút remote. */
     val appGanDuoc: List<String> get() = trangThai?.let { tt -> tt.coBieuTuong.filter { it in tt.caiDat && it !in tt.daTat }.sortedBy { com.txa.cleantxa.dulieu.tenDep(it).lowercase() } } ?: emptyList()
 
     /** HomeKeyService cần bật: phím Home lạ, phím app remote, hoặc mở app khi bật từ chế độ chờ. */
-    val canDichVuPhim get() = nutHome || dungPhimRemote || (moKhiBat && moKhiThuc) || luonVeHome || phimGan.isNotEmpty() || nutHenTat
+    val canDichVuPhim get() = nutHome || dungPhimRemote || (moKhiBat && moKhiThuc) || luonVeHome || phimGan.isNotEmpty() || nutHenTat || nutDaNhiem
     /**
      * Ô kênh đặt ở đầu dock, theo thứ tự chọn: VTVgo (3.0.0, mọi kênh), FPT Play và IPTV (3.1.0). Tối đa KENH_TOI_DA (link_tiles).
      */
@@ -559,6 +597,10 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         if (com.txa.cleantxa.ManHinh.laTv && com.txa.cleantxa.TxaLogger.hasPendingTvError(ctx)) {
             man = Man.TV_LOI_QR
         }
+        // Điện thoại mở app: tự động quét cùng mạng Wi-Fi và kết nối ngầm với TV đã tin cậy (kể cả khi TV đã tắt ADB).
+        if (!com.txa.cleantxa.ManHinh.laTv) {
+            quetLinkNgam(tuKetNoi = com.txa.cleantxa.link.TxaLinkStore.tuKetNoiNgam(ctx))
+        }
         viewModelScope.launch {
             runCatching { io { com.txa.cleantxa.CapNhat.dongBoTuCleanYourTv(ctx) } }
         }
@@ -594,6 +636,18 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
                 if (!com.txa.cleantxa.CapNhat.moTuThongBao) continue
                 val b = banMoi ?: runCatching { io { com.txa.cleantxa.CapNhat.kiemTraApp() } }.getOrNull()?.also { banMoi = it }
                 if (b != null) xuLyBanMoi(b) else com.txa.cleantxa.CapNhat.moTuThongBao = false
+            }
+        }
+        // Nhận nội dung "Chia sẻ → CleanTxa" từ YouTube / Trình duyệt / Bộ sưu tập ảnh trên điện thoại và bắn thẳng lên TV!
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(350)
+                val sharedTxt = com.txa.cleantxa.link.TxaLinkStore.pendingSharedText
+                val sharedImg = com.txa.cleantxa.link.TxaLinkStore.pendingSharedImageUri
+                if (sharedTxt == null && sharedImg == null) continue
+                com.txa.cleantxa.link.TxaLinkStore.pendingSharedText = null
+                com.txa.cleantxa.link.TxaLinkStore.pendingSharedImageUri = null
+                xuLyChiaSeTuAppKhac(sharedTxt, sharedImg)
             }
         }
     }
@@ -808,12 +862,91 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
 
     private suspend fun <T> io(khoi: () -> T): T = withContext(Dispatchers.IO) { khoi() }
 
-    // ---------- Kết nối ----------
+    // ---------- Kết nối & Liên kết ngầm (CleanTxa Link) ----------
 
-    /** Quét cả mạng /24 của điện thoại tìm máy mở cổng 5555. */
+    /** Quét tìm các TV đang chạy ngầm CleanTxa trên cùng mạng Wi-Fi; tự kết nối ngầm nếu đã tin cậy đôi bên. */
+    fun quetLinkNgam(tuKetNoi: Boolean = true) {
+        if (dangQuetLink || com.txa.cleantxa.ManHinh.laTv) return
+        dangQuetLink = true
+        viewModelScope.launch {
+            try {
+                val ds = com.txa.cleantxa.link.TxaLinkClient.discoverLan(ctx, ipDienThoai())
+                dsTvLink.clear()
+                dsTvLink.addAll(ds)
+                if (tuKetNoi && thongTin == null && !dangBan) {
+                    val tinCay = ds.firstOrNull { it.isTrusted }
+                    if (tinCay != null) {
+                        runCatching { napQuaLink(tinCay.ip, tinCay.port, tinCay.trustedToken!!, tinCay.tvId, chuyenMan = false) }
+                    }
+                }
+            } finally {
+                dangQuetLink = false
+            }
+        }
+    }
+
+    /** Bấm kết nối tới một TV phát hiện qua CleanTxa Link: đã tin cậy thì vào thẳng, chưa thì gửi yêu cầu mã 4 số lên TV. */
+    fun chonTvLink(d: com.txa.cleantxa.link.TxaLinkClient.DiscoveredTv, chuyenMan: Boolean = true) {
+        val tok = d.trustedToken ?: com.txa.cleantxa.link.TxaLinkStore.timTvTinCay(ctx, d.tvId)?.token
+        if (!tok.isNullOrBlank()) {
+            chay(t("Đang kết nối ngầm tới ${d.name}…", "Linking to ${d.name}…")) {
+                napQuaLink(d.ip, d.port, tok, d.tvId, chuyenMan = chuyenMan)
+            }
+            return
+        }
+        val pin = (1000..9999).random().toString()
+        maGhepLinkDangCho = pin
+        chay(t("Nhìn lên màn hình TV (${d.name}) và bấm \"Tin tưởng\" · Mã $pin…", "Look at the TV (${d.name}) and press \"Trust\" · Code $pin…")) {
+            try {
+                val trusted = com.txa.cleantxa.link.TxaLinkClient.pairWithTv(ctx, d, pin)
+                val idx = dsTvLink.indexOfFirst { it.tvId == d.tvId }
+                if (idx >= 0) dsTvLink[idx] = dsTvLink[idx].copy(trustedToken = trusted.token)
+                napQuaLink(trusted.lastIp, trusted.port, trusted.token, trusted.tvId, chuyenMan = true)
+            } finally {
+                maGhepLinkDangCho = null
+            }
+        }
+    }
+
+    private suspend fun napQuaLink(host: String, port: Int, token: String, tvId: String, chuyenMan: Boolean) {
+        val client = com.txa.cleantxa.link.TxaLinkClient(host, port, token, tvId)
+        val st = io { client.docTrangThaiDayDu() }
+        linkClient = client
+        dangAdb = false
+        daNapCu = false
+        ip = host
+        prefs.edit().putString("ip", host).apply()
+        goiHome = st.pkgHome
+        thongTin = st.info
+        trangThai = st.trangThai
+        boNho = st.boNho
+        ramTv = st.ram
+        amLuongTv = st.volCur to st.volMax
+        doToiTv = st.dimPercent
+        dangChieuAnhTv = st.photoShowing
+        appDangMoTrenTv = st.activePkg
+        henTatLuc = st.sleepTimerSec
+        appTuCai = st.appTuCai
+        goCoDau = st.hasA11y || daCoHomeSach
+        khongPhaiTivi = false
+        xacNhanLaTivi = true
+        val du = io { DuLieu.nap(ctx) }
+        ungVien = du.khopMau(st.info)
+        mauChon = ungVien.firstOrNull()?.first
+        ganGiong = du.ganGiong(st.info, ungVien.map { it.first.id }.toSet())
+        tatCaMau = du.mau.sortedBy { it.ten.lowercase() }
+        saoLuu = kho.doc(st.info.khoaLuu)
+        laMayChieu = tv.coVeMayChieu(st.trangThai, st.info)
+        nutNgu = laMayChieu
+        chuanBiDock()
+        if (chuyenMan) man = Man.THONG_TIN
+    }
+
+    /** Quét cả mạng /24 của điện thoại tìm cả TV chạy ngầm CleanTxa Link (2312) lẫn cổng ADB (5555). */
     fun quetMang() {
         if (dangQuet) return
         dangQuet = true; timThay.clear(); loi = ""
+        quetLinkNgam(tuKetNoi = false)
         viewModelScope.launch {
             try {
                 val goc = ipDienThoai() ?: run { loi = t("Điện thoại chưa vào Wi-Fi.", "The phone is not on Wi-Fi."); return@launch }
@@ -827,7 +960,9 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
                         }
                     }
                 }.awaitAll()
-                if (timThay.isEmpty()) loi = t("Không thấy tivi nào mở cổng 5555. Google TV đời mới thường chỉ có Gỡ lỗi không dây: dùng phần ghép đôi.", "No TV with port 5555 open. Newer Google TVs often only offer Wireless debugging: use pairing.")
+                if (timThay.isEmpty() && dsTvLink.isEmpty()) {
+                    loi = t("Không thấy tivi nào mở cổng 5555 hay chạy ngầm CleanTxa. Google TV đời mới chỉ bật ADB thì dùng phần ghép đôi 6 số.", "No TV with port 5555 or CleanTxa Link found. For newer Google TVs, use 6-digit Wireless debugging pairing.")
+                }
             } finally { dangQuet = false }
         }
     }
@@ -965,6 +1100,7 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun sauKhiKetNoi(host: String) {
+        dangAdb = true
         daNapCu = false
         tv.quenTivi()
         thongBao = t("Đang đọc thông tin tivi…", "Reading the TV…")
@@ -978,6 +1114,31 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         xacNhanLaTivi = false
         val tt = io { tv.docTrangThai() }
         trangThai = tt
+        // Nếu trên TV đã cài sẵn app CleanTxa, tự cấp quyền + trao khoá tin cậy để kể cả khi tắt ADB vẫn kết nối ngầm được!
+        if (!com.txa.cleantxa.ManHinh.laTv && host != "127.0.0.1" && "com.txa.cleantxa" in tt.caiDat) {
+            runCatching {
+                val phoneId = com.txa.cleantxa.link.TxaLinkStore.deviceId(ctx)
+                val phoneName = com.txa.cleantxa.link.TxaLinkStore.deviceName()
+                val tok = com.txa.cleantxa.link.TxaLinkStore.taoTokenNgauNhien()
+                io {
+                    tv.kichHoatLienKetTrenTv(phoneId, phoneName, tok)
+                    Thread.sleep(700)
+                    com.txa.cleantxa.link.TxaLinkClient.pingHost(ctx, host, com.txa.cleantxa.link.TxaLinkStore.PORT, 1200)?.let { ping ->
+                        val trusted = com.txa.cleantxa.link.TxaLinkStore.TrustedTv(
+                            tvId = ping.tvId,
+                            name = ping.name,
+                            model = ping.model,
+                            lastIp = host,
+                            port = ping.port,
+                            token = tok,
+                            pairedAt = System.currentTimeMillis(),
+                        )
+                        com.txa.cleantxa.link.TxaLinkStore.luuTvTinCay(ctx, trusted)
+                        linkClient = com.txa.cleantxa.link.TxaLinkClient(host, ping.port, tok, ping.tvId)
+                    }
+                }
+            }
+        }
         // Công tắc DNS AdGuard theo đúng tivi (24/10/2026, góp ý kimhuenguyen1964: kết nối lại thì công tắc luôn tắt).
         dnsChanQc = io { tv.dnsDangChan() }
         val du = io { DuLieu.nap(ctx) }
@@ -1189,9 +1350,215 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     }
 
     fun chupManHinh() = chay(t("Đang chụp màn hình tivi…", "Taking a TV screenshot…")) {
-        val bytes = io { tv.chupManHinh() }
+        val lc = linkClient
+        val bytes = if (!dangAdb && lc != null) {
+            io { lc.chupManHinhQuaLink() }
+                ?: error(
+                    t(
+                        "Không chụp được qua Liên kết ngầm. Kiểm tra TV đang chạy Android 11+ và đã bật quyền Trợ năng của CleanTxa trên TV (một số video bản quyền như Netflix cũng chặn chụp hình).",
+                        "Could not capture over Wi-Fi Link. Ensure the TV runs Android 11+ with CleanTxa Accessibility enabled (DRM video also blocks screenshots).",
+                    )
+                )
+        } else {
+            io { tv.chupManHinh() }
+        }
         anhTv = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
             ?: error(t("Không chụp được (một số tivi cấm chụp khi đang xem HDMI, bấm Home trên remote rồi thử lại).", "Could not capture (some TVs block it on an HDMI input — press Home on the remote and retry)."))
+    }
+
+    fun chiaSeAnhChupTv() {
+        val bmp = anhTv ?: return
+        viewModelScope.launch {
+            runCatching {
+                val uri = io {
+                    val dir = java.io.File(ctx.cacheDir, "share").apply { mkdirs() }
+                    val f = java.io.File(dir, "cleantxa-tv-${System.currentTimeMillis()}.jpg")
+                    f.outputStream().use { out -> bmp.compress(Bitmap.CompressFormat.JPEG, 90, out) }
+                    androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", f)
+                }
+                val gui = android.content.Intent(android.content.Intent.ACTION_SEND)
+                    .setType("image/jpeg")
+                    .putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                ctx.startActivity(
+                    android.content.Intent.createChooser(gui, t("Chia sẻ ảnh chụp TV", "Share TV screenshot"))
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+        }
+    }
+
+    // ---------- Đặc quyền độc quyền CleanTxa Link (Không cần ADB) ----------
+
+    private suspend fun damBaoLinkClient(): com.txa.cleantxa.link.TxaLinkClient? {
+        linkClient?.let { return it }
+        val ds = com.txa.cleantxa.link.TxaLinkClient.discoverLan(ctx, ipDienThoai())
+        dsTvLink.clear()
+        dsTvLink.addAll(ds)
+        val tinCay = ds.firstOrNull { it.isTrusted } ?: return null
+        runCatching { napQuaLink(tinCay.ip, tinCay.port, tinCay.trustedToken!!, tinCay.tvId, chuyenMan = false) }
+        return linkClient
+    }
+
+    private fun xuLyChiaSeTuAppKhac(sharedTxt: String?, sharedImg: android.net.Uri?) = chay(
+        t("Đang bắn nội dung sang tivi…", "Beaming to your TV…")
+    ) {
+        val lc = damBaoLinkClient()
+        if (lc == null) {
+            if (!sharedTxt.isNullOrBlank()) linkCanBan = sharedTxt
+            error(
+                t(
+                    "Chưa tìm thấy TV tin cậy nào đang chạy ngầm trên cùng mạng Wi-Fi. Hãy ghép tin cậy với TV trước rồi bấm gửi lại.",
+                    "No trusted TV found online on this Wi-Fi. Pair with your TV first, then send again.",
+                )
+            )
+        }
+        if (sharedImg != null) {
+            val bytes = io { nenAnhChieuTv(sharedImg) } ?: error(t("Không đọc được ảnh vừa chia sẻ.", "Could not read shared image."))
+            val res = io { lc.chieuAnhLenTv(bytes, t("Chia sẻ từ điện thoại", "Shared from phone")) }
+            if (!res.optBoolean("ok", false)) error(res.optString("error", t("Không chiếu được ảnh lên TV.", "Could not beam photo to TV.")))
+            dangChieuAnhTv = res.optBoolean("overlay", false)
+            man = Man.REMOTE
+            remoteBao = t("Đã chiếu ảnh toàn màn hình lên tivi!", "Photo beamed full-screen onto the TV!")
+            return@chay
+        }
+        if (!sharedTxt.isNullOrBlank()) {
+            val hasUrl = Regex("""[a-zA-Z][a-zA-Z0-9+.-]*://\S+""").containsMatchIn(sharedTxt)
+            if (hasUrl) {
+                val res = io { lc.banLinkLenTv(sharedTxt) }
+                man = Man.REMOTE
+                if (res.optBoolean("ok", false)) {
+                    remoteBao = t("Đã mở ngay đường dẫn vừa chia sẻ trên màn hình tivi!", "Opened shared link right on your TV!")
+                } else {
+                    linkCanBan = sharedTxt
+                    remoteBao = t("Tivi chưa có ứng dụng nhận đường dẫn này.", "No app on the TV could open this link.")
+                }
+            } else {
+                io { lc.ghiClipboardTv(sharedTxt, pasteNow = true) }
+                chuGo = sharedTxt
+                man = Man.REMOTE
+                remoteBao = t("Đã chép nội dung sang Clipboard tivi (và điền vào ô nhập nếu đang mở).", "Copied text to TV clipboard.")
+            }
+        }
+    }
+
+    private fun nenAnhChieuTv(uri: android.net.Uri): ByteArray? = runCatching {
+        val raw = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(raw, 0, raw.size, bounds)
+        var sample = 1
+        while (bounds.outWidth / sample > 2560 || bounds.outHeight / sample > 1440) sample *= 2
+        val bmp = BitmapFactory.decodeByteArray(raw, 0, raw.size, BitmapFactory.Options().apply { inSampleSize = sample })
+            ?: return null
+        val scale = minOf(1920f / bmp.width.coerceAtLeast(1), 1080f / bmp.height.coerceAtLeast(1), 1f)
+        val finalBmp = if (scale < 1f) {
+            val scaled = Bitmap.createScaledBitmap(
+                bmp,
+                (bmp.width * scale).toInt().coerceAtLeast(1),
+                (bmp.height * scale).toInt().coerceAtLeast(1),
+                true,
+            )
+            if (scaled !== bmp) bmp.recycle()
+            scaled
+        } else {
+            bmp
+        }
+        val bos = java.io.ByteArrayOutputStream()
+        finalBmp.compress(Bitmap.CompressFormat.JPEG, 86, bos)
+        finalBmp.recycle()
+        bos.toByteArray()
+    }.getOrNull()
+
+    fun datAmLuongTv(muc: Int) {
+        val lc = linkClient ?: return
+        val max = amLuongTv?.second ?: 15
+        amLuongTv = muc.coerceIn(0, max) to max
+        guiRemote {
+            val res = lc.datAmLuong(muc)
+            viewModelScope.launch { amLuongTv = res }
+        }
+    }
+
+    fun datDoToiManHinhTv(phanTram: Int) {
+        val lc = linkClient ?: return
+        val clamped = phanTram.coerceIn(0, 75)
+        doToiTv = clamped
+        guiRemote {
+            val res = lc.datDoToiManHinh(clamped)
+            if (!res.optBoolean("ok", false)) {
+                viewModelScope.launch {
+                    doToiTv = 0
+                    remoteBao = res.optString("error", t("Cần cấp quyền Hiện đè (Overlay) trên TV để dùng Chế độ dịu mắt.", "Grant Overlay permission on TV once to use Night Dimmer."))
+                }
+            }
+        }
+    }
+
+    fun banLinkLenTv(chuoi: String = linkCanBan) = chay(t("Đang bắn link sang tivi…", "Opening link on TV…")) {
+        val lc = linkClient ?: error(t("Tính năng này cần kết nối qua CleanTxa Link.", "Requires CleanTxa Link connection."))
+        val s = chuoi.trim()
+        if (s.isEmpty()) error(t("Dán đường dẫn YouTube, web hoặc luồng phát trước.", "Paste a YouTube, web, or stream URL first."))
+        val res = io { lc.banLinkLenTv(s) }
+        if (!res.optBoolean("ok", false)) {
+            error(res.optString("error", t("Tivi chưa có trình duyệt hoặc ứng dụng mở được đường dẫn này.", "No app on the TV handled this URL.")))
+        }
+        linkCanBan = ""
+        remoteBao = t("Đã mở ngay trên tivi: ${res.optString("url", s)}", "Opened on TV: ${res.optString("url", s)}")
+    }
+
+    fun chieuAnhLenTv(uri: android.net.Uri) = chay(t("Đang chiếu ảnh lên màn hình tivi…", "Beaming photo to TV…")) {
+        val lc = linkClient ?: error(t("Tính năng này cần kết nối qua CleanTxa Link.", "Requires CleanTxa Link connection."))
+        val bytes = io { nenAnhChieuTv(uri) } ?: error(t("Không đọc được file ảnh này.", "Could not read this photo."))
+        val res = io { lc.chieuAnhLenTv(bytes) }
+        if (!res.optBoolean("ok", false)) {
+            error(res.optString("error", t("Không hiển thị được ảnh trên tivi.", "Could not show photo on TV.")))
+        }
+        dangChieuAnhTv = res.optBoolean("overlay", false)
+        remoteBao = t("Đang chiếu ảnh toàn màn hình trên tivi!", "Showing photo full-screen on TV!")
+    }
+
+    fun dongAnhTrenTv() {
+        val lc = linkClient ?: return
+        dangChieuAnhTv = false
+        guiRemote { lc.dongAnhTrenTv() }
+    }
+
+    fun guiThongBaoLenTv(loiNhan: String = tinNhanTv, docTo: Boolean = docToTinNhanTv, giay: Int = 10) = chay(
+        t("Đang gửi thông báo nổi lên tivi…", "Sending live message to TV…")
+    ) {
+        val lc = linkClient ?: error(t("Tính năng này cần kết nối qua CleanTxa Link.", "Requires CleanTxa Link connection."))
+        val msg = loiNhan.trim()
+        if (msg.isEmpty()) error(t("Nhập nội dung lời nhắn cần hiện trên màn hình tivi.", "Enter a message to show on the TV."))
+        val res = io { lc.guiThongBaoNoi(msg, docTo, giay) }
+        if (!res.optBoolean("ok", false)) error(res.optString("error", t("Không gửi được lời nhắn.", "Could not send message.")))
+        if (loiNhan == tinNhanTv) tinNhanTv = ""
+        remoteBao = if (docTo) {
+            t("Đã hiện thông báo nổi & phát giọng nói trên tivi!", "Displayed banner & spoke message on TV!")
+        } else {
+            t("Đã hiện thông báo nổi trên màn hình tivi!", "Displayed live banner on TV!")
+        }
+    }
+
+    fun dayClipboardLenTv(chuoi: String, danLuon: Boolean) = chay(t("Đang đồng bộ sang Clipboard tivi…", "Syncing to TV clipboard…")) {
+        val lc = linkClient ?: error(t("Tính năng này cần kết nối qua CleanTxa Link.", "Requires CleanTxa Link connection."))
+        if (chuoi.isBlank()) error(t("Clipboard điện thoại đang trống.", "Phone clipboard is empty."))
+        val res = io { lc.ghiClipboardTv(chuoi, danLuon) }
+        val pasted = res.optBoolean("pasted", false)
+        remoteBao = if (pasted) {
+            t("Đã chép sang TV và dán thẳng vào ô nhập đang mở!", "Copied to TV and pasted into focused input!")
+        } else {
+            t("Đã chép vào bộ nhớ tạm (Clipboard) của tivi!", "Copied to TV clipboard!")
+        }
+    }
+
+    fun layClipboardTuTv(onCopied: (String) -> Unit) = chay(t("Đang lấy văn bản từ tivi…", "Reading text from TV…")) {
+        val lc = linkClient ?: error(t("Tính năng này cần kết nối qua CleanTxa Link.", "Requires CleanTxa Link connection."))
+        val txt = io { lc.docClipboardTv() }
+        if (txt.isBlank()) {
+            error(t("Chưa có chữ nào trong Clipboard hoặc ô đang trỏ trên tivi.", "TV clipboard and focused field are empty."))
+        }
+        onCopied(txt)
+        remoteBao = t("Đã lấy từ TV về điện thoại: \"${txt.take(60)}\"", "Copied from TV: \"${txt.take(60)}\"")
     }
 
     // ---------- Remote trên điện thoại (3.5.0, góp ý build.dng 27/10/2026) ----------
@@ -1211,6 +1578,22 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
 
     fun moRemote() = chay(t("Đang mở remote…", "Opening the remote…")) {
         remoteBao = ""
+        val lc = linkClient
+        if (!dangAdb && lc != null) {
+            val st = io { lc.docTrangThaiDayDu() }
+            trangThai = st.trangThai
+            boNho = st.boNho
+            ramTv = st.ram
+            amLuongTv = st.volCur to st.volMax
+            doToiTv = st.dimPercent
+            dangChieuAnhTv = st.photoShowing
+            appDangMoTrenTv = st.activePkg
+            goCoDau = st.hasA11y || daCoHomeSach
+            henTatLuc = st.sleepTimerSec
+            appTuCai = st.appTuCai
+            man = Man.REMOTE
+            return@chay
+        }
         goCoDau = daCoHomeSach && io { tv.coGoCoDau() }
         henTatLuc = io { tv.docHenTatTivi() }
         appTuCai = io { tv.appTuCai() }
@@ -1223,13 +1606,37 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun bamPhim(ma: Int) = guiRemote { tv.phim(ma) }
+    fun bamPhim(ma: Int) = guiRemote {
+        val lc = linkClient
+        if (!dangAdb && lc != null) {
+            val res = lc.guiPhim(ma)
+            if (!res.optBoolean("ok", false) && res.optBoolean("needA11y", false)) {
+                viewModelScope.launch {
+                    remoteBao = t(
+                        "Phím này cần bật quyền Trợ năng của CleanTxa một lần trên tivi (mở app CleanTxa trên tivi để cấp).",
+                        "This key needs CleanTxa's Accessibility permission enabled once on the TV."
+                    )
+                }
+            }
+        } else {
+            tv.phim(ma)
+        }
+    }
 
     fun guiChu(xuongDong: Boolean = false) {
         val chu = chuGo
         if (chu.isEmpty() && !xuongDong) return
         chuGo = ""
         guiRemote {
+            val lc = linkClient
+            if (!dangAdb && lc != null) {
+                val res = lc.goChu(chu, xuongDong)
+                val ok = res.optBoolean("ok", false)
+                viewModelScope.launch {
+                    remoteBao = if (ok) "" else t("Chọn một ô nhập chữ trên tivi trước, và bật quyền Trợ năng của CleanTxa trên tivi.", "Select a text box on the TV first, and enable CleanTxa's Accessibility permission on the TV.")
+                }
+                return@guiRemote
+            }
             val du = tv.goChu(chu)
             if (xuongDong) tv.phim(66)
             viewModelScope.launch {
@@ -1239,6 +1646,10 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     }
 
     fun batGoCoDau() = chay(t("Đang bật gõ có dấu…", "Turning on accented typing…")) {
+        if (!dangAdb && linkClient != null) {
+            remoteBao = t("Mở CleanTxa trên tivi và bật mục \"Quyền Điều khiển & Gõ chữ\" một lần là gõ tiếng Việt có dấu luôn sẵn sàng.", "Open CleanTxa on the TV and enable \"Remote & Typing permission\" once.")
+            return@chay
+        }
         io { tv.batGoCoDau() }
         kotlinx.coroutines.delay(1500)
         goCoDau = io { tv.coGoCoDau() }
@@ -1247,17 +1658,30 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     }
 
     fun henTat(phut: Int) = chay(if (phut > 0) t("Đang hẹn giờ tắt…", "Setting the sleep timer…") else t("Đang huỷ hẹn giờ…", "Cancelling the timer…")) {
-        io { tv.henTatTivi(phut) }
-        henTatLuc = io { tv.docHenTatTivi() }
+        val lc = linkClient
+        if (!dangAdb && lc != null) {
+            henTatLuc = io { lc.henTat(phut) }
+        } else {
+            io { tv.henTatTivi(phut) }
+            henTatLuc = io { tv.docHenTatTivi() }
+        }
         remoteBao = if (phut > 0) t("Tivi sẽ tự tắt sau $phut phút, kể cả khi bạn đóng app.", "The TV will switch off in $phut minutes, even if you close the app.")
         else t("Đã huỷ hẹn giờ tắt.", "Sleep timer cancelled.")
     }
 
     fun moAppTv(pkg: String) = guiRemote {
-        if (!tv.moApp(pkg)) viewModelScope.launch { remoteBao = t("App này không có màn mở được.", "This app has nothing to open.") }
+        val lc = linkClient
+        val ok = if (!dangAdb && lc != null) lc.moApp(pkg) else tv.moApp(pkg)
+        if (!ok) viewModelScope.launch { remoteBao = t("App này không có màn mở được.", "This app has nothing to open.") }
     }
 
     fun goAppTv(pkg: String) = chay(t("Đang gỡ ${com.txa.cleantxa.dulieu.tenDep(pkg)}…", "Uninstalling ${com.txa.cleantxa.dulieu.tenDep(pkg)}…")) {
+        val lc = linkClient
+        if (!dangAdb && lc != null) {
+            if (!io { lc.goApp(pkg) }) error(t("Không gửi được yêu cầu gỡ sang tivi.", "Couldn't open uninstall prompt on TV."))
+            remoteBao = t("Đã mở hộp xác nhận gỡ trên màn hình tivi — bấm OK trên tivi để xác nhận.", "Opened uninstall prompt on the TV — confirm on the TV screen.")
+            return@chay
+        }
         if (!io { tv.goApp(pkg) }) error(t("Tivi không cho gỡ app này.", "The TV refused to uninstall this app."))
         trangThai = io { tv.docTrangThai() }
         appTuCai = io { tv.appTuCai() }
@@ -1271,6 +1695,12 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
 
     private suspend fun caiApkByte(du: ByteArray) {
         if (du.size < 4 || du[0] != 'P'.code.toByte() || du[1] != 'K'.code.toByte()) error(t("File này không phải APK.", "This isn't an APK file."))
+        val lc = linkClient
+        if (!dangAdb && lc != null) {
+            if (!io { lc.caiApk(du) }) error(t("Tivi chưa cấp quyền cài ứng dụng cho CleanTxa. Mở CleanTxa trên tivi để cấp quyền một lần.", "TV hasn't granted Install Unknown Apps to CleanTxa yet."))
+            remoteBao = t("Đã gửi APK sang tivi và mở hộp cài đặt trên màn hình tivi.", "APK sent and installer opened on the TV screen.")
+            return
+        }
         val ra = io { tv.caiApkTuDienThoai(du) }
         if (!ra.contains("Success")) error(t("Tivi không cài được: $ra", "The TV couldn't install it: $ra"))
         trangThai = io { tv.docTrangThai() }
@@ -1302,6 +1732,20 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     private suspend fun napCauHinhCu() {
         if (daNapCu) return
         daNapCu = true
+        val lc = linkClient
+        if (!dangAdb && lc != null) {
+            val (j, wp) = runCatching { io { lc.docCauHinhHome() } }.getOrDefault(null to null)
+            if (j != null) {
+                napTuJson(j)
+                if (anhNenRieng == null && wp != null && j.optBoolean("wallpaper")) {
+                    val laAnhTheme = !j.optBoolean("vgs_anh_rieng") && io {
+                        com.txa.cleantxa.dulieu.THEMES.mapNotNull { it.anhNen }.any { a -> runCatching { ctx.assets.open(a).readBytes().contentEquals(wp) }.getOrDefault(false) }
+                    }
+                    if (!laAnhTheme) anhNenRieng = wp
+                }
+            }
+            return
+        }
         val j = runCatching { io { tv.docCauHinhTv() } }.getOrNull() ?: return
         napTuJson(j)
         // Ảnh nền riêng đã đặt từ trước: đọc lại từ tivi để Áp dụng lần sau không thay bằng ảnh theme (23/10/2026).
@@ -1358,10 +1802,13 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         luonVeHome = j.optBoolean("power_on_home_always", false)
         nutHenTat = j.optBoolean("sleep_timer_button", false)
         nutNgu = j.optBoolean("sleep_button", nutNgu)
+        nutDaNhiem = j.optBoolean("recents_button", false)
         phimGan.clear(); j.optJSONArray("vgs_phim_gan")?.let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotBlank() }.forEach { phimGan.add(it) } }
         chuTrang = !cuaTheme("header_white") && j.optBoolean("header_white", false)
         if (j.optInt("vgs_bo_rieng", 0) > 1) phutDoiAnh = j.optInt("wallpaper_rotation_minutes", 15)
         mauChu = j.optString("header_color").takeIf { Regex("#[0-9A-Fa-f]{6}").matches(it) }
+        j.optString("accent_color").takeIf { Regex("#[0-9A-Fa-f]{6}").matches(it) }?.let { txaMauNhan = it }
+        j.optString("tile_corner_style").takeIf { it in setOf("rounded", "pill", "sharp") }?.let { txaBoGoc = it }
         khungDau = j.optBoolean("header_panel", false)
         // Chỉ nạp số cột do người dùng chọn ở đây (vgs_so_cot), không lấy columns của theme.
         soCot = if (j.optBoolean("vgs_so_cot", false)) j.optInt("columns", 0) else 0
@@ -1448,6 +1895,18 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     }
 
     fun giaiPhongRamNen() = chay(t("Đang giải phóng RAM nền trên TV…", "Trimming background RAM on TV…")) {
+        val lc = linkClient
+        if (!dangAdb && lc != null) {
+            val (freed, storage) = io { lc.giaiPhongRam() }
+            boNho = storage
+            val freedMb = freed / (1024 * 1024)
+            android.widget.Toast.makeText(
+                ctx,
+                t("Đã dọn tiến trình nền qua Liên kết Wi-Fi (trống thêm ~${freedMb} MB RAM).", "Trimmed background processes over Wi-Fi Link (~${freedMb} MB RAM freed)."),
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+            return@chay
+        }
         if (io { tv.giaiPhongRamNen() }) {
             com.txa.cleantxa.TxaLogger.i("TvSpeed", "Executed am kill-all on TV")
             thongBao = t("Đã dọn các tiến trình nền để giải phóng RAM.", "Background processes trimmed to free RAM.")
@@ -1588,9 +2047,12 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
             put("clock_24h", txa24h)
             put("show_lunar_calendar", amLich)
             put("tile_scale", txaCoO)
+            put("tile_corner_style", txaBoGoc)
+            put("accent_color", txaMauNhan)
             put("show_wifi_button", txaNutWifi)
             put("show_settings_button", txaNutCaiDat)
             put("show_network_ip", txaHienIp)
+            put("recents_button", nutDaNhiem)
         }
         put("uniform_tiles", oDeuNhau)
         if (moKhiBat) put("open_on_start_choice", true)
@@ -1598,6 +2060,7 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         if (luonVeHome) put("power_on_home_always", true)
         if (nutHenTat) put("sleep_timer_button", true)
         put("sleep_button", nutNgu)
+        if (nutDaNhiem) put("recents_button", true)
         if (chuTrang) put("header_white", true)
         mauChu?.let { put("header_color", it) }
         if (khungDau) put("header_panel", true)
@@ -1645,9 +2108,9 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         if (daDat.isNotEmpty()) put("vgs_nang_cao", JSONArray(daDat))
     }.toString()
 
-    /** App tự cài kiểu điện thoại (Phim4K…) vào library_apps để hiện trên Home sạch; dò lỗi thì gửi nguyên cấu hình. */
+    /** App tự cài hoặc chọn vào dock kiểu điện thoại (Phim4K, Appstore hãng…) vào library_apps để hiện trên Home sạch; dò lỗi thì gửi nguyên cấu hình. */
     private suspend fun voiAppNgoai(json: String): String =
-        runCatching { com.txa.cleantxa.dulieu.AppNgoai.gop(json, io { tv.appNgoaiKhongLoiTv() }) }.getOrDefault(json)
+        runCatching { com.txa.cleantxa.dulieu.AppNgoai.gop(json, io { tv.appNgoaiKhongLoiTv(dock.toSet()) }) }.getOrDefault(json)
 
     // ---------- Lưu / mở file cấu hình (góp ý 9000000, 23/10/2026) ----------
     var cauHinhBao by mutableStateOf("")
@@ -1859,6 +2322,23 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     fun apDungTheme() = chay(t("Đang đổi giao diện…", "Applying the theme…")) { apDungThemeBen() }
 
     private suspend fun apDungThemeBen() {
+        val lc = linkClient
+        if (!dangAdb && lc != null) {
+            // Đang nối ngầm không cần ADB: ghi thẳng cấu hình, ảnh nền, bộ ảnh và logo kênh qua ThemeProvider của Home sạch trên TV!
+            val targetPkg = if (homeTxa) ThaoTacTv.PKG_HOME_TXA else goiHome
+            val json = cauHinhHome()
+            val anh = anhNenTheme()
+            val bo = boAnhTheme()
+            napAnhKenh()
+            thongBao = t("Đang gửi giao diện sang tivi qua Liên kết ngầm…", "Sending look to TV over Wi-Fi Link…")
+            val res = io { lc.apDungHome(targetPkg, json, anh, bo, tv.anhKenh) }
+            if (!res.optBoolean("ok", false)) {
+                error(res.optString("error", t("Chưa áp dụng được giao diện qua Liên kết ngầm.", "Couldn't apply look over Wi-Fi Link.")))
+            }
+            homeXong = true
+            cauHinhBao = t("Đã áp dụng giao diện mới lên tivi (không cần ADB)!", "Applied new look to the TV (no ADB needed)!")
+            return
+        }
         val json = voiAppNgoai(cauHinhHome())
         val anh = anhNenTheme()
         napAnhKenh()
@@ -1874,7 +2354,7 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         if (bo != null) thongBao = t("Đang gửi ${bo.size} ảnh nền…", "Sending ${bo.size} wallpaper pictures…")
         io { tv.dayCauHinh(json, anh, bo) }
         io { tv.datNutInput(nutInput) }
-        if (dungPhimRemote || (moKhiBat && moKhiThuc) || luonVeHome || phimGan.isNotEmpty() || nutHenTat) io { tv.batBatPhimHome() }
+        if (dungPhimRemote || (moKhiBat && moKhiThuc) || luonVeHome || phimGan.isNotEmpty() || nutHenTat || nutDaNhiem) io { tv.batBatPhimHome() }
         // Đổi giao diện cũng bật / tắt DNS AdGuard theo công tắc (trước 2.7.3 chỉ lúc cài Home sạch mới đặt).
         val dangChan = io { tv.dnsDangChan() }
         if (dnsChanQc && !dangChan) saoLuu?.let { sl -> io { tv.batDnsChanQc(sl) } }
@@ -1909,9 +2389,45 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     var daTuTatAdb by mutableStateOf(false)
     private var daHenTatAdb = false
 
+    /** Ngắt phiên Liên kết ngầm Wi-Fi hiện tại (nhưng vẫn giữ danh sách tin cậy cho lần sau). */
+    fun ngatLienKetNgam() {
+        if (!dangAdb) {
+            datLai()
+            loi = ""
+            man = Man.CHINH
+        } else {
+            linkClient = null
+        }
+    }
+
     /** App quay lại từ nền khi đang nối tivi: kiểm kết nối, rớt thì nối lại ngầm (không đụng khi đang chạy việc). */
     fun kiemKetNoiKhiVe() {
-        if (thongTin == null || dangBan || daHenTatAdb) return
+        if (dangBan || daHenTatAdb) return
+        if (thongTin == null) {
+            if (!com.txa.cleantxa.ManHinh.laTv && com.txa.cleantxa.link.TxaLinkStore.tuKetNoiNgam(ctx)) {
+                quetLinkNgam(tuKetNoi = true)
+            }
+            return
+        }
+        if (!dangAdb && linkClient != null) {
+            val lc = linkClient ?: return
+            viewModelScope.launch {
+                runCatching {
+                    val st = io { lc.docTrangThaiDayDu() }
+                    trangThai = st.trangThai
+                    boNho = st.boNho
+                    ramTv = st.ram
+                    amLuongTv = st.volCur to st.volMax
+                    doToiTv = st.dimPercent
+                    dangChieuAnhTv = st.photoShowing
+                    appDangMoTrenTv = st.activePkg
+                    henTatLuc = st.sleepTimerSec
+                }.onFailure {
+                    if (com.txa.cleantxa.link.TxaLinkStore.tuKetNoiNgam(ctx)) quetLinkNgam(tuKetNoi = true)
+                }
+            }
+            return
+        }
         viewModelScope.launch { runCatching { io { tv.giuKetNoi() } } }
     }
 
@@ -1990,6 +2506,8 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
         thongBao = ""
         datLai()
         man = Man.CHINH
+        // ADB đã tắt nhưng nếu TV có CleanTxa chạy ngầm và đã tin cậy, tự nối lại ngầm luôn!
+        quetLinkNgam(tuKetNoi = true)
     }
 
     // ---------- Khôi phục ----------
@@ -2081,6 +2599,8 @@ class PhienLamViec(app: Application) : AndroidViewModel(app) {
     }
 
     fun datLai() {
+        dangAdb = false; linkClient = null; ramTv = null
+        amLuongTv = null; doToiTv = 0; dangChieuAnhTv = false; appDangMoTrenTv = ""
         thongTin = null; trangThai = null; muc = emptyList(); chon.clear(); ketQua = null
         dock.clear(); tenChao = ""; homeXong = false; dnsChanQc = false; dangKhoiPhuc = false; khoiPhucXong = false; anhTv = null
         laMayChieu = false; mayChieu = null; ghimMayChieu.clear()

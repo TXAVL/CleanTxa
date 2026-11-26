@@ -44,4 +44,7 @@
     <string name="connect_err_ip">Hãy nhập địa chỉ IP hợp lệ, như 192.168.1.25.</string>
     <string name="connect_err_failed">Không kết nối được. Kiểm tra đã bật gỡ lỗi, TV đang bật và cùng Wi-Fi rồi thử lại.</string>
     <string name="connect_err_detail">Chi tiết: %1$s</string>
+    <string name="txa_link_notif_label">Thông báo điện thoại TxaLink</string>
+    <string name="txa_link_a11y_label">TxaLink Helper</string>
+    <string name="txa_link_a11y_desc">Cho phép điện thoại đã tin cậy điều khiển tivi, gõ tiếng Việt có dấu và tắt màn hình qua Wi-Fi ngay cả khi đã tắt ADB.</string>
 </resources>

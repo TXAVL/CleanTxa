@@ -170,6 +170,9 @@ data class ThongTinTv(
 
 /** Tên dễ đọc cho các app hay gặp (shell không lấy được nhãn app). */
 val TEN_APP = mapOf(
+    // Hành động của launcher (app_keys), không phải gói: gán nút remote mở màn đa nhiệm hoặc Thư viện app.
+    "recents" to "Đa nhiệm (app gần đây)",
+    "library" to "Thư viện app",
     "com.netflix.ninja" to "Netflix",
     "vn.vtv.vtvgotv" to "VTVgo",
     "com.netflix.mediaclient" to "Netflix",
@@ -213,6 +216,8 @@ val TEN_APP = mapOf(
 )
 
 private val TEN_APP_EN = mapOf(
+    "recents" to "Recent apps",
+    "library" to "App library",
     "com.google.android.videos" to "Google TV / Play Movies",
     "com.google.android.apps.mediashell" to "Chromecast (cast from phone)",
     "com.google.android.katniss" to "Google Assistant (voice)",

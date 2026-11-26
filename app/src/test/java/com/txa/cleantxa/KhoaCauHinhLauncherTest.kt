@@ -16,7 +16,9 @@ class KhoaCauHinhLauncherTest {
         "show_quick_actions", "show_recent", "show_inputs", "show_kids_button",
         "show_now_playing", "show_input_button", "columns",
         "show_clock", "show_clock_seconds", "show_date", "clock_24h", "show_lunar_calendar",
-        "tile_scale", "show_wifi_button", "show_settings_button", "show_network_ip",
+        "tile_scale", "tile_corner_style", "accent_color",
+        "show_wifi_button", "show_settings_button", "show_network_ip",
+        "recents_button",
     )
 
     @Test

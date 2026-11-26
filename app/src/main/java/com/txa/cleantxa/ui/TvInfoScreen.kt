@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SettingsRemote
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tv
@@ -108,7 +109,9 @@ fun TvInfoScreen(vm: PhienLamViec) {
 
         TxaCard(
             title = tv.tenHienThi.ifBlank { tv.model },
-            subtitle = "Android ${tv.android} (SDK ${tv.sdk}) · ${vm.ip}:${vm.cong}",
+            subtitle = "Android ${tv.android} (SDK ${tv.sdk}) · " +
+                if (!vm.dangAdb && vm.dangLienKetNgam) t("🔗 Liên kết ngầm Wi-Fi (${vm.ip}) · Không cần ADB", "🔗 Wi-Fi Background Link (${vm.ip}) · No ADB")
+                else "${vm.ip}:${vm.cong}",
             icon = Icons.Default.Tv,
             highlighted = true,
         ) {
@@ -139,12 +142,12 @@ fun TvInfoScreen(vm: PhienLamViec) {
                     )
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { vm.donBoNhoDem() }, enabled = !vm.dangBan) {
+                        OutlinedButton(onClick = { vm.donBoNhoDem() }, enabled = !vm.dangBan && vm.dangAdb) {
                             Icon(Icons.Default.CleaningServices, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
                             Text(t("Xoá cache", "Clear cache"))
                         }
-                        OutlinedButton(onClick = { vm.moAppChiemCho() }, enabled = !vm.dangBan) {
+                        OutlinedButton(onClick = { vm.moAppChiemCho() }, enabled = !vm.dangBan && vm.dangAdb) {
                             Icon(Icons.Default.Storage, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
                             Text(t("App chiếm chỗ", "App storage"))
@@ -182,7 +185,7 @@ fun TvInfoScreen(vm: PhienLamViec) {
                     FilterChip(
                         selected = active,
                         onClick = { vm.datTiLeHieuUng(scale) },
-                        enabled = !vm.dangBan,
+                        enabled = !vm.dangBan && vm.dangAdb,
                         leadingIcon = { Icon(Icons.Default.Speed, null, Modifier.size(16.dp)) },
                         label = { Text(label) },
                     )
@@ -200,7 +203,7 @@ fun TvInfoScreen(vm: PhienLamViec) {
                     Spacer(Modifier.width(6.dp))
                     Text(t("Giải phóng RAM nền", "Free background RAM"))
                 }
-                OutlinedButton(onClick = { hoiKhoiDongLai = true }, enabled = !vm.dangBan) {
+                OutlinedButton(onClick = { hoiKhoiDongLai = true }, enabled = !vm.dangBan && vm.dangAdb) {
                     Icon(Icons.Default.RestartAlt, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(t("Khởi động lại TV", "Reboot TV"))
@@ -238,9 +241,10 @@ fun TvInfoScreen(vm: PhienLamViec) {
             )
         }
 
+        val soMau = vm.tatCaMau.size.takeIf { it > 0 } ?: 513
         TxaCard(
             title = t("Danh sách mẫu cho tivi này", "TV model profile"),
-            subtitle = t("So với 457 danh sách đã thử từ cộng đồng CleanYourTV.", "Matched against 457 tested community lists."),
+            subtitle = t("So với $soMau danh sách đã thử từ cộng đồng CleanYourTV.", "Matched against $soMau tested community lists."),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 vm.ungVien.forEach { (m, score) ->
@@ -285,20 +289,33 @@ fun TvInfoScreen(vm: PhienLamViec) {
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (!vm.dangAdb && vm.dangLienKetNgam) {
+                Text(
+                    t(
+                        "Đang điều khiển qua Liên kết ngầm Wi-Fi (ADB đang tắt): bạn có thể dùng đầy đủ Remote, gõ tiếng Việt, cài APK, giải phóng RAM và Tuỳ chỉnh giao diện Home sạch. Chỉ khi cần tắt / bật lại gói hệ thống của hãng mới cần bật tạm ADB.",
+                        "Connected via Wi-Fi Background Link (ADB is off): Remote, Vietnamese typing, APK install, RAM boost, and Clean Home customisation all work directly. Turn on ADB only when disabling or restoring system packages."
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
             Button(
                 onClick = { vm.lapKeHoach() },
-                enabled = !vm.dangBan && !vm.chanKhongPhaiTivi,
+                enabled = !vm.dangBan && !vm.chanKhongPhaiTivi && vm.dangAdb,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Default.CleaningServices, null, Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(t("Bước tiếp: Chọn gói cần tắt", "Next: Select packages to disable"))
+                Text(
+                    if (!vm.dangAdb && vm.dangLienKetNgam) t("Chọn gói cần tắt (cần bật ADB)", "Select packages to disable (needs ADB)")
+                    else t("Bước tiếp: Chọn gói cần tắt", "Next: Select packages to disable")
+                )
             }
 
             if (!vm.khongCaiHome) {
                 OutlinedButton(
                     onClick = { if (vm.daCoHomeSach) vm.moDoiTheme() else vm.boQuaDon() },
-                    enabled = !vm.dangBan && !vm.chanKhongPhaiTivi,
+                    enabled = !vm.dangBan && !vm.chanKhongPhaiTivi && (vm.dangAdb || vm.daCoHomeSach),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(Icons.Default.Home, null, Modifier.size(18.dp))
@@ -322,7 +339,7 @@ fun TvInfoScreen(vm: PhienLamViec) {
                 }
                 OutlinedButton(
                     onClick = { vm.moKhoaTre() },
-                    enabled = !vm.dangBan,
+                    enabled = !vm.dangBan && vm.dangAdb,
                     modifier = Modifier.weight(1f),
                 ) {
                     Icon(Icons.Default.ChildCare, null, Modifier.size(18.dp))
@@ -336,12 +353,25 @@ fun TvInfoScreen(vm: PhienLamViec) {
                     val sl = vm.saoLuu
                     if (sl != null) vm.moKhoiPhuc(sl) else vm.man = Man.KHOI_PHUC
                 },
-                enabled = !vm.dangBan,
+                enabled = !vm.dangBan && vm.dangAdb,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Default.Restore, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(t("Khôi phục / Bật lại từng app", "Restore / Re-enable apps"))
+            }
+
+            // Tivi đã dọn / đã có Home sạch thì cho xuất báo cáo chẩn đoán ngay sau khi kết nối từ điện thoại.
+            if (com.txa.cleantxa.ManHinh.laTv || vm.daCoHomeSach || vm.saoLuu != null || vm.coDauCleanTv) {
+                OutlinedButton(
+                    onClick = { vm.xuatBaoCaoChanDoan() },
+                    enabled = !vm.dangBan && vm.dangAdb,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.Share, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(t("Xuất báo cáo chẩn đoán", "Export diagnostic report"))
+                }
             }
         }
     }

@@ -5,7 +5,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object WeatherClient {
-    data class WeatherInfo(val tempC: Int, val summary: String)
+    data class WeatherInfo(val tempC: Int, val summary: String, val icon: String)
 
     @Volatile
     private var lastFetchMs = 0L
@@ -15,7 +15,8 @@ object WeatherClient {
     private var cached: WeatherInfo? = null
 
     fun fetch(lat: Double, lon: Double): WeatherInfo? {
-        val key = "$lat,$lon"
+        val lang = if (java.util.Locale.getDefault().language == "vi") "vi" else "en"
+        val key = "$lat,$lon,$lang"
         val now = System.currentTimeMillis()
         if (key == lastKey && now - lastFetchMs < 30 * 60_000L && cached != null) {
             return cached
@@ -30,7 +31,8 @@ object WeatherClient {
             val cw = json.optJSONObject("current_weather") ?: return@runCatching null
             val temp = Math.round(cw.optDouble("temperature", 0.0)).toInt()
             val code = cw.optInt("weathercode", 0)
-            WeatherInfo(temp, describe(code)).also {
+            val (icon, desc) = describe(code)
+            WeatherInfo(temp, desc, icon).also {
                 lastKey = key
                 lastFetchMs = now
                 cached = it
@@ -38,14 +40,15 @@ object WeatherClient {
         }.getOrNull()
     }
 
-    private fun describe(code: Int): String = when (code) {
-        0 -> "Quang đãng"
-        1, 2, 3 -> "Có mây"
-        45, 48 -> "Sương mù"
-        51, 53, 55, 61, 63, 65 -> "Có mưa"
-        80, 81, 82 -> "Mưa rào"
-        95, 96, 99 -> "Giông"
-        else -> "Mát mẻ"
+    private fun describe(code: Int): Pair<String, String> = when (code) {
+        0 -> "☀" to tr("Quang đãng", "Clear")
+        1, 2 -> "🌤" to tr("Ít mây", "Partly cloudy")
+        3 -> "☁" to tr("Nhiều mây", "Overcast")
+        45, 48 -> "🌫" to tr("Sương mù", "Foggy")
+        51, 53, 55, 61, 63, 65 -> "🌧" to tr("Có mưa", "Rain")
+        71, 73, 75, 77 -> "❄" to tr("Tuyết", "Snow")
+        80, 81, 82 -> "🌦" to tr("Mưa rào", "Showers")
+        95, 96, 99 -> "⛈" to tr("Giông bão", "Thunderstorm")
+        else -> "🌤" to tr("Mát mẻ", "Mild")
     }
 }
-

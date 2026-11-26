@@ -44,4 +44,7 @@
     <string name="connect_err_ip">Enter a valid IP address, like 192.168.1.25.</string>
     <string name="connect_err_failed">Could not connect. Check that debugging is on, the TV is awake and on the same Wi-Fi, then try again.</string>
     <string name="connect_err_detail">Detail: %1$s</string>
+    <string name="txa_link_notif_label">TxaLink phone notifications</string>
+    <string name="txa_link_a11y_label">TxaLink Helper</string>
+    <string name="txa_link_a11y_desc">Allows your trusted phone to control this TV, type Vietnamese text, and sleep the screen over Wi-Fi even when ADB is turned off.</string>
 </resources>

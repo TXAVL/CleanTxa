@@ -60,6 +60,12 @@ val THEMES = listOf(
         mapOf("background_color" to "#000000"), null, listOf(0xFF000000, 0xFF111111)),
     Theme("sau-cot", "Nhiều app", "More apps", "6 cột, thấy thêm một hàng app", "6 columns, one more row visible",
         mapOf("columns" to 6, "rows_below_dock" to 1, "background_color" to "#000000"), null, listOf(0xFF111111, 0xFF222233)),
+    Theme("oled-luc-bao", "OLED Ngọc lục bảo", "Emerald OLED", "Đen tuyền tiết kiệm OLED, viền sáng xanh lục bảo", "Pure black for OLED, emerald glow accents",
+        mapOf("background_color" to "#000000", "sky_intensity" to 0, "dock_glass" to true, "app_glow" to true, "accent_color" to "#10B981"), null, listOf(0xFF000000, 0xFF064E3B, 0xFF10B981)),
+    Theme("hoang-hon", "Hoàng hôn ấm", "Warm Sunset", "Tông hổ phách & tím chiều dịu mắt ban đêm", "Warm amber & dusk purple, easy on the eyes at night",
+        mapOf("background_color" to "#160C18", "sky_intensity" to 40, "dock_glass" to true, "accent_color" to "#F59E0B", "header_color" to "#FEF3C7"), null, listOf(0xFF160C18, 0xFF4C1D3D, 0xFFD97706)),
+    Theme("pho-dem", "Phố đêm Neon", "Neon Night", "Xanh biển sâu & tím neon, khay kính phát sáng", "Deep midnight blue & neon violet, glowing glass dock",
+        mapOf("background_color" to "#070B19", "sky_intensity" to 30, "dock_glass" to true, "app_glow" to true, "accent_color" to "#A78BFA", "header_panel" to true), null, listOf(0xFF070B19, 0xFF1E1B4B, 0xFF7C3AED)),
 )
 
 /** Thành phố cho dòng thời tiết trên Home sạch (weather_lat/lon/place của launcher). */
